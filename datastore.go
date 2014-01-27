@@ -1,8 +1,8 @@
 package nds
 
 import (
-	"appengine/datastore"
 	"appengine"
+	"appengine/datastore"
 )
 
 func Get(c appengine.Context, key *datastore.Key, dst interface{}) error {
