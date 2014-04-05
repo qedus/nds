@@ -97,3 +97,67 @@ func TestGetMultiNoErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestGetMultiErrorMix(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		Val int
+	}
+
+	for _, count := range []int{999, 1000, 1001, 5000, 5001} {
+
+		// Create entities.
+		keys := []*datastore.Key{}
+		entities := []*testEntity{}
+		for i := 0; i < count; i++ {
+			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+			keys = append(keys, key)
+			entities = append(entities, &testEntity{i})
+		}
+
+		// Save entities.
+		for i, key := range keys {
+			if i%2 == 0 {
+				if _, err := datastore.Put(c, key, entities[i]); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+
+		te := &testEntity{}
+		if err := datastore.Get(c, keys[2], te); err != nil {
+			t.Fatal(err)
+		}
+
+		respEntities := []testEntity{}
+		for _, _ = range keys {
+			respEntities = append(respEntities, testEntity{})
+		}
+
+		err := nds.GetMulti(c, keys, respEntities)
+		if err == nil {
+			t.Fatal("should be errors")
+		}
+
+		// Check respEntities are in order.
+		for i, re := range respEntities {
+			if i%2 == 0 {
+				if re.Val != entities[i].Val {
+					t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+						entities[i].Val)
+				}
+			} else if me, ok := err.(appengine.MultiError); ok {
+				if me[i] != datastore.ErrNoSuchEntity {
+					t.Fatal("Incorrect error")
+				}
+			} else {
+				t.Fatal("incorrect error")
+			}
+		}
+	}
+}
