@@ -13,6 +13,12 @@ const (
     multiLimit = 1000
 )
 
+var (
+    // milMultiError is a convenience slice used to represent a nil error when
+    // grouping erros in GetMulti.
+    nilMultiError = make(appengine.MultiError, multiLimit)
+)
+
 func Get(c appengine.Context, key *datastore.Key, dst interface{}) error {
 	return datastore.Get(c, key, dst)
 }
@@ -41,46 +47,39 @@ func GetMulti(c appengine.Context,
     for i := 0; i < p; i++ {
         keySlice := keys[i*multiLimit:(i+1)*multiLimit]
         dstSlice := v.Slice(i*multiLimit, (i+1)*multiLimit)
-        errs = append(errs, datastore.GetMulti(c, keySlice, dstSlice))
+        errs = append(errs, datastore.GetMulti(c, keySlice, 
+            dstSlice.Interface()))
     }
 
-    keySlice := keys[p*multiLimit:len(keys)]
-    dstSlice := v.Slice(p*multiLimit, len(keys))
-    errs = append(errs, datastore.GetMulti(c, keySlice, dstSlice))
+    if len(keys) % multiLimit != 0 {
+        keySlice := keys[p*multiLimit:len(keys)]
+        dstSlice := v.Slice(p*multiLimit, len(keys))
+        errs = append(errs, datastore.GetMulti(c, keySlice, 
+            dstSlice.Interface()))
+    }
 
-    // Make sure error is nil or appengine.MultiError.
+    // Quick escape if all errors are nil.
     errsNil := true
     for _, err := range errs {
         if err != nil {
             errsNil = false
         } 
-        if _, ok := err.(appengine.MultiError); !ok {
-            return err
-        }
     }
-
-    // Easy case. All errors are nil.
     if errsNil {
         return nil
     }
 
-    // At this point some errors are nil and some are appengine.MultiError. We
-    // must group them into one long appengine.MultiError.
     groupedErrs := make(appengine.MultiError, 0, len(keys))
-    for i, err := range errs {
+    for _, err := range errs {
         if err == nil {
-            r := multiLimit
-            if i == len(errs) - 1 {
-                r = len(keys) % multiLimit
-            }
-            for j := 0; j < r; j++ {
-                groupedErrs = append(groupedErrs, nil)
-            }
+            groupedErrs = append(groupedErrs, nilMultiError...)
         } else if me, ok := err.(appengine.MultiError); ok {
             groupedErrs = append(groupedErrs, me...)
+        } else {
+            return err
         }
     }
-    return groupedErrs
+    return groupedErrs[:len(keys)]
 }
 
 func Put(c appengine.Context, 

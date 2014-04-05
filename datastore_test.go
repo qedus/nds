@@ -9,7 +9,7 @@ import (
     "github.com/qedus/nds"
 )
 
-func TestGetMulti(t *testing.T) {
+func TestGetMultiNoSuchEntity(t *testing.T) {
     c, err := aetest.NewContext(nil)
     if err != nil {
         t.Fatal(err)
@@ -31,10 +31,10 @@ func TestGetMulti(t *testing.T) {
             entities = append(entities, &testEntity{})
         }
 
-        err = nds.GetMulti(c, keys, entities)
+        err := nds.GetMulti(c, keys, entities)
         if me, ok := err.(appengine.MultiError); ok {
             if len(me) != count {
-                t.Fatal("multi error lenght incorrect")
+                t.Fatal("multi error length incorrect")
             }
             for _, e := range me {
                 if e != datastore.ErrNoSuchEntity {
@@ -43,37 +43,56 @@ func TestGetMulti(t *testing.T) {
             }
         }
     }
+}
 
-    // Test entity saved.
-    if _, err := datastore.Put(c, datastore.NewKey(c, "Test", "3", 0, nil),
-    &testEntity{3}); err != nil {
+func TestGetMultiNoErrors(t *testing.T) {
+    c, err := aetest.NewContext(nil)
+    if err != nil {
         t.Fatal(err)
     }
+    defer c.Close()
+
+    type testEntity struct {
+        Val int
+    }
+
     for _, count := range []int{ 999, 1000, 1001, 5000, 5001} {
 
+        // Create entities.
         keys := []*datastore.Key{}
         entities := []*testEntity{}
         for i := 0; i < count; i++ {
-            keys = append(keys, 
-            datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
-            entities = append(entities, &testEntity{})
+            key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+            keys = append(keys, key)
+            entities = append(entities, &testEntity{i})
         }
 
-        err = nds.GetMulti(c, keys, entities)
-        if me, ok := err.(appengine.MultiError); ok {
-            if len(me) != count {
-                t.Fatal("multi error lenght incorrect")
+        // Save entities.
+        for i, key := range keys {
+            if _, err := datastore.Put(c, key, entities[i]); err != nil {
+                t.Fatal(err)
             }
-            for i, e := range me {
-                if i == 3 {
-                    if e != nil {
-                        t.Fatal("shoud be nil error")
-                    }
-                } else {
-                    if e != datastore.ErrNoSuchEntity {
-                        t.Fatal(e)
-                    }
-                }
+        }
+
+        te := &testEntity{}
+        if err := datastore.Get(c, keys[2], te); err != nil {
+            t.Fatal(err)
+        }
+
+        respEntities := []testEntity{}
+        for _, _ = range keys {
+            respEntities = append(respEntities, testEntity{})
+        }
+
+        if err := nds.GetMulti(c, keys, respEntities); err != nil {
+            t.Fatal(err)
+        }
+
+        // Check respEntities are in order.
+        for i, re := range respEntities {
+            if re.Val != entities[i].Val {
+                t.Fatalf("respEntities in wrong order, %d vs %d", re.Val, 
+                    entities[i].Val)
             }
         }
     }
