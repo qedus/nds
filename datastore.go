@@ -47,15 +47,15 @@ func GetMulti(c appengine.Context,
 	for i := 0; i < p; i++ {
 		keySlice := keys[i*multiLimit : (i+1)*multiLimit]
 		dstSlice := v.Slice(i*multiLimit, (i+1)*multiLimit)
-		errs = append(errs, datastore.GetMulti(c, keySlice,
-			dstSlice.Interface()))
+		err := datastore.GetMulti(c, keySlice, dstSlice.Interface())
+		errs = append(errs, err)
 	}
 
 	if len(keys)%multiLimit != 0 {
 		keySlice := keys[p*multiLimit : len(keys)]
 		dstSlice := v.Slice(p*multiLimit, len(keys))
-		errs = append(errs, datastore.GetMulti(c, keySlice,
-			dstSlice.Interface()))
+		err := datastore.GetMulti(c, keySlice, dstSlice.Interface())
+		errs = append(errs, err)
 	}
 
 	// Quick escape if all errors are nil.
