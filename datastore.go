@@ -43,10 +43,11 @@ func GetMulti(c appengine.Context,
 	errs := make([]error, p+1)
 	wg := sync.WaitGroup{}
 	for i := 0; i < p; i++ {
+		index := i
 		keySlice := keys[i*multiLimit : (i+1)*multiLimit]
 		dstSlice := v.Slice(i*multiLimit, (i+1)*multiLimit)
+
 		wg.Add(1)
-		index := i
 		go func() {
 			errs[index] = datastore.GetMulti(c, keySlice, dstSlice.Interface())
 			wg.Done()
