@@ -5,6 +5,7 @@ import (
 	"appengine/datastore"
 	"errors"
 	"reflect"
+	"sync"
 )
 
 const (
@@ -19,13 +20,9 @@ var (
 	nilMultiError = make(appengine.MultiError, multiLimit)
 )
 
-func Get(c appengine.Context, key *datastore.Key, dst interface{}) error {
-	return datastore.Get(c, key, dst)
-}
-
-// GetMulti works just like datastore.GetMulti except it calls
-// datastore.GetMulti as many times as required to complete a request of over
-// 1000 entities.
+// GetMulti works just like datastore.GetMulti except it removes the API limit
+// of 1000 entities per request by calling datastore.GetMulti as many times as
+// required to complete the request.
 func GetMulti(c appengine.Context,
 	keys []*datastore.Key, dst interface{}) error {
 
@@ -43,20 +40,31 @@ func GetMulti(c appengine.Context,
 	}
 
 	p := len(keys) / multiLimit
-	errs := make([]error, 0, p+1)
+	errs := make([]error, p+1)
+	wg := sync.WaitGroup{}
 	for i := 0; i < p; i++ {
 		keySlice := keys[i*multiLimit : (i+1)*multiLimit]
 		dstSlice := v.Slice(i*multiLimit, (i+1)*multiLimit)
-		err := datastore.GetMulti(c, keySlice, dstSlice.Interface())
-		errs = append(errs, err)
+		wg.Add(1)
+		index := i
+		go func() {
+			errs[index] = datastore.GetMulti(c, keySlice, dstSlice.Interface())
+			wg.Done()
+		}()
 	}
 
-	if len(keys)%multiLimit != 0 {
+	if len(keys)%multiLimit == 0 {
+		errs = errs[:len(errs)-1]
+	} else {
 		keySlice := keys[p*multiLimit : len(keys)]
 		dstSlice := v.Slice(p*multiLimit, len(keys))
-		err := datastore.GetMulti(c, keySlice, dstSlice.Interface())
-		errs = append(errs, err)
+		wg.Add(1)
+		go func() {
+			errs[p] = datastore.GetMulti(c, keySlice, dstSlice.Interface())
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	// Quick escape if all errors are nil.
 	errsNil := true
@@ -80,9 +88,4 @@ func GetMulti(c appengine.Context,
 		}
 	}
 	return groupedErrs[:len(keys)]
-}
-
-func Put(c appengine.Context,
-	key *datastore.Key, src interface{}) (*datastore.Key, error) {
-	return datastore.Put(c, key, src)
 }

@@ -1,7 +1,9 @@
 nds
 ===
 
-This is a library for Google App Engine.
+This is a datastore library for Google App Engine.
+
+You can find API documentation at [http://godoc.org/github.com/qedus/nds](http://godoc.org/github.com/qedus/nds).
 
 Its aim is to follow some of the feature set of Python ndb but still conforming to the App Engine datastore API.
 

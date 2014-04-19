@@ -74,11 +74,6 @@ func TestGetMultiNoErrors(t *testing.T) {
 			}
 		}
 
-		te := &testEntity{}
-		if err := datastore.Get(c, keys[2], te); err != nil {
-			t.Fatal(err)
-		}
-
 		respEntities := []testEntity{}
 		for _, _ = range keys {
 			respEntities = append(respEntities, testEntity{})
@@ -120,18 +115,13 @@ func TestGetMultiErrorMix(t *testing.T) {
 			entities = append(entities, &testEntity{i})
 		}
 
-		// Save entities.
+		// Save every other entity.
 		for i, key := range keys {
 			if i%2 == 0 {
 				if _, err := datastore.Put(c, key, entities[i]); err != nil {
 					t.Fatal(err)
 				}
 			}
-		}
-
-		te := &testEntity{}
-		if err := datastore.Get(c, keys[2], te); err != nil {
-			t.Fatal(err)
 		}
 
 		respEntities := []testEntity{}
@@ -153,10 +143,11 @@ func TestGetMultiErrorMix(t *testing.T) {
 				}
 			} else if me, ok := err.(appengine.MultiError); ok {
 				if me[i] != datastore.ErrNoSuchEntity {
-					t.Fatal("Incorrect error")
+					t.Fatalf("incorrect error %+v, index %d, of %d",
+						me, i, count)
 				}
 			} else {
-				t.Fatal("incorrect error")
+				t.Fatal("incorrect error, index %d", i)
 			}
 		}
 	}
