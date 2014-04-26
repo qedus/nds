@@ -16,7 +16,7 @@ const (
 
 var (
 	// milMultiError is a convenience slice used to represent a nil error when
-	// grouping erros in GetMulti.
+	// grouping errors in GetMulti.
 	nilMultiError = make(appengine.MultiError, multiLimit)
 )
 
