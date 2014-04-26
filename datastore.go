@@ -20,6 +20,18 @@ var (
 	nilMultiError = make(appengine.MultiError, multiLimit)
 )
 
+func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
+	if v.Kind() != reflect.Slice {
+		return errors.New("nds: dst is not a slice")
+	}
+
+	if len(keys) != v.Len() {
+		return errors.New("nds: key and dst slices have different length")
+	}
+
+	return nil
+}
+
 // GetMulti works just like datastore.GetMulti except it removes the API limit
 // of 1000 entities per request by calling datastore.GetMulti as many times as
 // required to complete the request.
@@ -31,12 +43,8 @@ func GetMulti(c appengine.Context,
 	keys []*datastore.Key, dst interface{}) error {
 
 	v := reflect.ValueOf(dst)
-	if v.Kind() != reflect.Slice {
-		return errors.New("nds: dst is not a slice")
-	}
-
-	if len(keys) != v.Len() {
-		return errors.New("nds: key and dst slices have different length")
+	if err := checkMultiArgs(keys, v); err != nil {
+		return err
 	}
 
 	if len(keys) == 0 {
