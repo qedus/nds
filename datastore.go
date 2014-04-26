@@ -23,6 +23,10 @@ var (
 // GetMulti works just like datastore.GetMulti except it removes the API limit
 // of 1000 entities per request by calling datastore.GetMulti as many times as
 // required to complete the request.
+//
+// Increase the datastore timeout if you get datastore_v3: TIMEOUT errors. You
+// can do this using
+// http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
 func GetMulti(c appengine.Context,
 	keys []*datastore.Key, dst interface{}) error {
 
