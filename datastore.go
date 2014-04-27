@@ -4,7 +4,6 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"errors"
-	"fmt"
 	"reflect"
 	"sync"
 )
@@ -126,6 +125,7 @@ func GetMultiCache(c appengine.Context,
 	}
 
 	if cc, ok := c.(*cacheContext); ok {
+		fmt.Println("In getMultiCache")
 		return getMultiCache(cc, keys, v)
 	} else {
 		return datastore.GetMulti(c, keys, dst)
@@ -166,7 +166,7 @@ func getMultiCache(cc *cacheContext,
 	errs := make(appengine.MultiError, dst.Len())
 	errsNil := true
 
-	// Load what we can from the local cache.
+	// Load from local memory cache.
 	cc.RLock()
 	for i, key := range keys {
 		if pl, ok := cc.cache[key.Encode()]; ok {
@@ -229,8 +229,9 @@ func getMultiCache(cc *cacheContext,
 
 	if errsNil {
 		return nil
+	} else {
+		return errs
 	}
-	return errs
 }
 
 func PutMultiCache(c appengine.Context,
@@ -243,7 +244,6 @@ func PutMultiCache(c appengine.Context,
 
 	if cc, ok := c.(*cacheContext); ok {
 		if pls, err := convertToPropertyLists(v); err != nil {
-			fmt.Println("Convert error", err)
 			return nil, err
 		} else {
 			return putMultiCache(cc, keys, pls)
