@@ -176,6 +176,7 @@ func getMultiCache(cc *cacheContext,
 			} else {
 				elem := addrValue(dst.Index(i))
 				if err := LoadStruct(elem.Interface(), pl); err != nil {
+					cc.RUnlock()
 					return err
 				}
 			}
