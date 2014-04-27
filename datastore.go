@@ -163,7 +163,7 @@ func getMultiCache(cc *cacheContext,
 	cacheMissKeys := []*datastore.Key{}
 	cacheMissDsts := []datastore.PropertyList{}
 
-	errors := make(appengine.MultiError, dst.Len())
+	errs := make(appengine.MultiError, dst.Len())
 	errsNil := true
 
 	// Load what we can from the local cache.
@@ -171,7 +171,7 @@ func getMultiCache(cc *cacheContext,
 	for i, key := range keys {
 		if pl, ok := cc.cache[key.Encode()]; ok {
 			if pl == nil {
-				errors[i] = datastore.ErrNoSuchEntity
+				errs[i] = datastore.ErrNoSuchEntity
 				errsNil = false
 			} else {
 				elem := addrValue(dst.Index(i))
@@ -215,7 +215,7 @@ func getMultiCache(cc *cacheContext,
 			} else if err == datastore.ErrNoSuchEntity {
 				putLocalCache(cc, cacheMissKeys[i], nil)
 				index := cacheMissIndexes[i]
-				errors[index] = datastore.ErrNoSuchEntity
+				errs[index] = datastore.ErrNoSuchEntity
 				errsNil = false
 				// Possibly should zero the callers slice value here.
 			} else {
@@ -229,7 +229,7 @@ func getMultiCache(cc *cacheContext,
 	if errsNil {
 		return nil
 	}
-	return errors
+	return errs
 }
 
 func PutMultiCache(c appengine.Context,
