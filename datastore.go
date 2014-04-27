@@ -4,6 +4,7 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -101,4 +102,207 @@ func GetMulti(c appengine.Context,
 		}
 	}
 	return groupedErrs[:len(keys)]
+}
+
+type cacheContext struct {
+	appengine.Context
+	cache map[string]*datastore.PropertyList
+	sync.RWMutex
+}
+
+func NewCacheContext(c appengine.Context) appengine.Context {
+	return &cacheContext{
+		Context: c,
+		cache:   map[string]*datastore.PropertyList{},
+	}
+}
+
+func GetMultiCache(c appengine.Context,
+	keys []*datastore.Key, dst interface{}) error {
+
+	v := reflect.ValueOf(dst)
+	if err := checkMultiArgs(keys, v); err != nil {
+		return err
+	}
+
+	if cc, ok := c.(*cacheContext); ok {
+		return getMultiCache(cc, keys, v)
+	} else {
+		return datastore.GetMulti(c, keys, dst)
+	}
+}
+
+func convertToPropertyLists(
+	v reflect.Value) ([]datastore.PropertyList, error) {
+	pls := make([]datastore.PropertyList, v.Len())
+	for i := range pls {
+		pl := datastore.PropertyList{}
+		elem := addrValue(v.Index(i))
+		if err := SaveStruct(elem.Interface(), &pl); err != nil {
+			return nil, err
+		}
+		pls[i] = pl
+	}
+	return pls, nil
+}
+
+func addrValue(v reflect.Value) reflect.Value {
+	if v.Kind() != reflect.Ptr {
+		return v.Addr()
+	} else {
+		return v
+	}
+}
+
+// getMultiCache gets entities from local cache then the datastore.
+// dst argument must be a slice.
+func getMultiCache(cc *cacheContext,
+	keys []*datastore.Key, dst reflect.Value) error {
+
+	cacheMissIndexes := []int{}
+	cacheMissKeys := []*datastore.Key{}
+	cacheMissDsts := []datastore.PropertyList{}
+
+	errors := make(appengine.MultiError, dst.Len())
+	errsNil := true
+
+	// Load what we can from the local cache.
+	cc.RLock()
+	for i, key := range keys {
+		if pl, ok := cc.cache[key.Encode()]; ok {
+			if pl == nil {
+				errors[i] = datastore.ErrNoSuchEntity
+				errsNil = false
+			} else {
+				elem := addrValue(dst.Index(i))
+				if err := LoadStruct(elem.Interface(), pl); err != nil {
+					return err
+				}
+			}
+		} else {
+			cacheMissIndexes = append(cacheMissIndexes, i)
+			cacheMissKeys = append(cacheMissKeys, key)
+			cacheMissDsts = append(cacheMissDsts, datastore.PropertyList{})
+		}
+	}
+	cc.RUnlock()
+
+	// Load from datastore.
+	if err := datastore.GetMulti(cc, cacheMissKeys, cacheMissDsts); err == nil {
+		// Save to local memory cache.
+		putMultiLocalCache(cc, cacheMissKeys, cacheMissDsts)
+
+		// Update the callers slice with values.
+		for i, index := range cacheMissIndexes {
+			pl := cacheMissDsts[i]
+			elem := addrValue(dst.Index(index))
+			if err := LoadStruct(elem.Interface(), &pl); err != nil {
+				return err
+			}
+		}
+	} else if me, ok := err.(appengine.MultiError); ok {
+		for i, err := range me {
+			if err == nil {
+				putLocalCache(cc, cacheMissKeys[i], cacheMissDsts[i])
+
+				// Update the callers slice with values.
+				pl := cacheMissDsts[i]
+				index := cacheMissIndexes[i]
+				elem := addrValue(dst.Index(index))
+				if err := LoadStruct(elem.Interface(), &pl); err != nil {
+					return err
+				}
+			} else if err == datastore.ErrNoSuchEntity {
+				putLocalCache(cc, cacheMissKeys[i], nil)
+				index := cacheMissIndexes[i]
+				errors[index] = datastore.ErrNoSuchEntity
+				errsNil = false
+				// Possibly should zero the callers slice value here.
+			} else {
+				return err
+			}
+		}
+	} else {
+		return err
+	}
+
+	if errsNil {
+		return nil
+	}
+	return errors
+}
+
+func PutMultiCache(c appengine.Context,
+	keys []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
+
+	v := reflect.ValueOf(src)
+	if err := checkMultiArgs(keys, v); err != nil {
+		return nil, err
+	}
+
+	if cc, ok := c.(*cacheContext); ok {
+		if pls, err := convertToPropertyLists(v); err != nil {
+			fmt.Println("Convert error", err)
+			return nil, err
+		} else {
+			return putMultiCache(cc, keys, pls)
+		}
+	} else {
+		return datastore.PutMulti(c, keys, src)
+	}
+}
+
+// putMultiCache puts the entities into the datastore and then its local cache.
+func putMultiCache(cc *cacheContext,
+	keys []*datastore.Key,
+	pls []datastore.PropertyList) ([]*datastore.Key, error) {
+
+	// Save to the datastore.
+	completeKeys, err := datastore.PutMulti(cc, keys, pls)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to local memory cache.
+	putMultiLocalCache(cc, completeKeys, pls)
+
+	return completeKeys, nil
+}
+
+func putLocalCache(cc *cacheContext,
+	key *datastore.Key, pl datastore.PropertyList) {
+	cc.Lock()
+	cc.cache[key.Encode()] = &pl
+	cc.Unlock()
+}
+
+func putMultiLocalCache(cc *cacheContext,
+	keys []*datastore.Key, pls []datastore.PropertyList) {
+	for i, key := range keys {
+		putLocalCache(cc, key, pls[i])
+	}
+}
+
+// SaveStruct saves src to a datastore.PropertyList.
+func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
+	c, err := make(chan datastore.Property), make(chan error)
+	go func() {
+		err <- datastore.SaveStruct(src, c)
+	}()
+	for p := range c {
+		*pl = append(*pl, p)
+	}
+	return <-err
+}
+
+// LoadStruct loads a datastore.PropertyList into dst.
+func LoadStruct(dst interface{}, pl *datastore.PropertyList) error {
+	c := make(chan datastore.Property)
+	go func() {
+		for _, p := range *pl {
+			c <- p
+		}
+		close(c)
+	}()
+	return datastore.LoadStruct(dst, c)
 }
