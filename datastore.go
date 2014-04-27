@@ -3,7 +3,9 @@ package nds
 import (
 	"appengine"
 	"appengine/datastore"
+	"appengine/memcache"
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -12,6 +14,8 @@ const (
 	// multiLimit is the App Engine datastore limit for the number of entities
 	// that can be PutMulti or GetMulti in one call.
 	multiLimit = 1000
+
+	memcachePrefix = "NDS:"
 )
 
 var (
@@ -105,14 +109,14 @@ func GetMulti(c appengine.Context,
 
 type cacheContext struct {
 	appengine.Context
-	cache map[string]*datastore.PropertyList
+	cache map[string]datastore.PropertyList
 	sync.RWMutex
 }
 
 func NewCacheContext(c appengine.Context) appengine.Context {
 	return &cacheContext{
 		Context: c,
-		cache:   map[string]*datastore.PropertyList{},
+		cache:   map[string]datastore.PropertyList{},
 	}
 }
 
@@ -169,12 +173,12 @@ func getMultiCache(cc *cacheContext,
 	cc.RLock()
 	for i, key := range keys {
 		if pl, ok := cc.cache[key.Encode()]; ok {
-			if pl == nil {
+			if len(pl) == 0 {
 				errs[i] = datastore.ErrNoSuchEntity
 				errsNil = false
 			} else {
 				elem := addrValue(dst.Index(i))
-				if err := LoadStruct(elem.Interface(), pl); err != nil {
+				if err := LoadStruct(elem.Interface(), &pl); err != nil {
 					cc.RUnlock()
 					return err
 				}
@@ -186,6 +190,14 @@ func getMultiCache(cc *cacheContext,
 		}
 	}
 	cc.RUnlock()
+
+	// Load from memcache.
+	memcacheKeys := createMemcacheKeys(cacheMissKeys)
+	if _, err := memcache.GetMulti(cc, memcacheKeys); err != nil {
+		return err
+	} else {
+
+	}
 
 	// Load from datastore.
 	if err := datastore.GetMulti(cc, cacheMissKeys, cacheMissDsts); err == nil {
@@ -233,6 +245,14 @@ func getMultiCache(cc *cacheContext,
 	}
 }
 
+func createMemcacheKeys(keys []*datastore.Key) []string {
+	memcacheKeys := make([]string, len(keys))
+	for i, key := range keys {
+		memcacheKeys[i] = fmt.Sprintf("%s%s", memcachePrefix, key.Encode())
+	}
+	return memcacheKeys
+}
+
 func PutMultiCache(c appengine.Context,
 	keys []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
 
@@ -272,7 +292,7 @@ func putMultiCache(cc *cacheContext,
 func putLocalCache(cc *cacheContext,
 	key *datastore.Key, pl datastore.PropertyList) {
 	cc.Lock()
-	cc.cache[key.Encode()] = &pl
+	cc.cache[key.Encode()] = pl
 	cc.Unlock()
 }
 

@@ -178,64 +178,13 @@ func TestMultiCache(t *testing.T) {
 	}
 	defer c.Close()
 
-	type Entity struct {
-		Value string
-	}
-
-	cc := nds.NewCacheContext(c)
-
-	keys := []*datastore.Key{datastore.NewIncompleteKey(cc, "Test", nil)}
-	putEntities := []Entity{Entity{"one"}}
-
-	// Save to datastore and local cache.
-	putKeys, err := nds.PutMultiCache(cc, keys, putEntities)
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		if len(putKeys) != 1 {
-			t.Fatal("incorrect number of keys")
-		}
-		if putKeys[0].Incomplete() {
-			t.Fatal("incomplete key")
-		}
-	}
-
-	// Get from local cache.
-	getEntities := make([]Entity, 1)
-	if err := nds.GetMultiCache(cc, putKeys, getEntities); err != nil {
-		t.Fatal(err)
-	}
-
-	if getEntities[0].Value != "one" {
-		t.Fatal("entity value incorrect")
-	}
-
-	// Get from datastore by using a new context.
-	cc = nds.NewCacheContext(c)
-	//putKeys = []*datastore.Key{datastore.NewKey(cc, "Entity", "", 1, nil)}
-	getEntities = make([]Entity, 1)
-	if err := nds.GetMultiCache(cc, putKeys, getEntities); err != nil {
-		t.Fatal(err)
-	}
-
-	if getEntities[0].Value != "one" {
-		t.Fatal("entity value incorrect")
-	}
-}
-
-func TestMultiCache2(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
 	type testEntity struct {
 		Val int
 	}
 	const entityCount = 88
 
 	cc := nds.NewCacheContext(c)
+
 	// Create entities.
 	keys := []*datastore.Key{}
 	entities := []*testEntity{}
@@ -262,6 +211,39 @@ func TestMultiCache2(t *testing.T) {
 	}
 
 	me, ok := err.(appengine.MultiError)
+	if !ok {
+		t.Fatalf("not an appengine.MultiError: %+T", me)
+	}
+
+	// Check respEntities are in order.
+	for i, re := range respEntities {
+		if i%2 == 0 {
+			if re.Val != entities[i].Val {
+				t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+					entities[i].Val)
+			}
+			if me[i] != nil {
+				t.Fatal("should be nil error")
+			}
+		} else {
+			if re.Val != 0 {
+				t.Fatal("entity not zeroed")
+			}
+			if me[i] != datastore.ErrNoSuchEntity {
+				t.Fatalf("incorrect error %+v, index %d, of %d",
+					me, i, entityCount)
+			}
+		}
+	}
+
+	// Get from local cache.
+	respEntities = make([]testEntity, len(keys))
+	err = nds.GetMultiCache(cc, keys, respEntities)
+	if err == nil {
+		t.Fatal("should be errors")
+	}
+
+	me, ok = err.(appengine.MultiError)
 	if !ok {
 		t.Fatalf("not an appengine.MultiError: %+T", me)
 	}
