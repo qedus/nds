@@ -125,7 +125,6 @@ func GetMultiCache(c appengine.Context,
 	}
 
 	if cc, ok := c.(*cacheContext); ok {
-		fmt.Println("In getMultiCache")
 		return getMultiCache(cc, keys, v)
 	} else {
 		return datastore.GetMulti(c, keys, dst)
