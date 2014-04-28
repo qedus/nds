@@ -4,7 +4,6 @@ import (
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
-	"fmt"
 	"github.com/qedus/nds"
 	"strconv"
 	"testing"
@@ -216,11 +215,6 @@ func TestMultiCache(t *testing.T) {
 		t.Fatalf("not an appengine.MultiError: %+T, %s", err, err)
 	}
 
-	fmt.Println("respEntites", respEntities)
-	for i, e := range me {
-		fmt.Println(i, e)
-	}
-
 	// Check respEntities are in order.
 	for i, re := range respEntities {
 		if i%2 == 0 {
@@ -243,6 +237,40 @@ func TestMultiCache(t *testing.T) {
 	}
 
 	// Get from local cache.
+	respEntities = make([]testEntity, len(keys))
+	err = nds.GetMultiCache(cc, keys, respEntities)
+	if err == nil {
+		t.Fatal("should be errors")
+	}
+
+	me, ok = err.(appengine.MultiError)
+	if !ok {
+		t.Fatalf("not an appengine.MultiError: %+T", me)
+	}
+
+	// Check respEntities are in order.
+	for i, re := range respEntities {
+		if i%2 == 0 {
+			if re.Val != entities[i].Val {
+				t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+					entities[i].Val)
+			}
+			if me[i] != nil {
+				t.Fatal("should be nil error")
+			}
+		} else {
+			if re.Val != 0 {
+				t.Fatal("entity not zeroed")
+			}
+			if me[i] != datastore.ErrNoSuchEntity {
+				t.Fatalf("incorrect error %+v, index %d, of %d",
+					me, i, entityCount)
+			}
+		}
+	}
+
+	// Get from memcache.
+	cc = nds.NewCacheContext(c)
 	respEntities = make([]testEntity, len(keys))
 	err = nds.GetMultiCache(cc, keys, respEntities)
 	if err == nil {

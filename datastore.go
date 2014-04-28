@@ -185,7 +185,7 @@ type multiState struct {
 	errs      appengine.MultiError
 	errsCount int
 
-	keyIndexes map[*datastore.Key]int
+	keyIndex map[*datastore.Key]int
 
 	missingMemoryKeys map[*datastore.Key]bool
 
@@ -206,7 +206,7 @@ func newMultiState(keys []*datastore.Key, vals reflect.Value) *multiState {
 		vals: vals,
 		errs: make(appengine.MultiError, vals.Len()),
 
-		keyIndexes: make(map[*datastore.Key]int),
+		keyIndex: make(map[*datastore.Key]int),
 
 		missingMemoryKeys: make(map[*datastore.Key]bool),
 
@@ -217,7 +217,7 @@ func newMultiState(keys []*datastore.Key, vals reflect.Value) *multiState {
 	}
 
 	for i, key := range keys {
-		ms.keyIndexes[key] = i
+		ms.keyIndex[key] = i
 	}
 	return ms
 }
@@ -309,6 +309,8 @@ func loadMemoryCache(cc *cacheContext, ms *multiState) error {
 				}
 			}
 		} else {
+			ms.errs[index] = datastore.ErrNoSuchEntity
+			ms.errsCount++
 			ms.missingMemoryKeys[key] = true
 		}
 	}
@@ -335,7 +337,7 @@ func loadMemcache(cc *cacheContext, ms *multiState) error {
 					if pl, err := decodePropertyList(item.Value); err != nil {
 						return err
 					} else {
-						index := ms.keyIndexes[key]
+						index := ms.keyIndex[key]
 						if err := setVal(index, ms.vals, &pl); err != nil {
 							return err
 						}
@@ -367,7 +369,7 @@ func loadDatastore(c appengine.Context, ms *multiState) error {
 
 	if err := datastore.GetMulti(c, keys, pls); err == nil {
 		for i, key := range keys {
-			index := ms.keyIndexes[key]
+			index := ms.keyIndex[key]
 			if err := setVal(index, ms.vals, &pls[i]); err != nil {
 				return err
 			}
@@ -378,7 +380,7 @@ func loadDatastore(c appengine.Context, ms *multiState) error {
 		for i, err := range me {
 			if err == nil {
 				key := keys[i]
-				index := ms.keyIndexes[key]
+				index := ms.keyIndex[key]
 				if err := setVal(index, ms.vals, &pls[i]); err != nil {
 					return err
 				}
@@ -403,8 +405,8 @@ func saveMemcache(c appengine.Context, ms *multiState) error {
 	for key := range ms.missingMemcacheKeys {
 		memcacheKey := createMemcacheKey(key)
 		if !ms.missingDatastoreKeys[key] {
-			index := ms.keyIndexes[key]
-			s := ms.vals.Index(index)
+			index := ms.keyIndex[key]
+			s := addrValue(ms.vals.Index(index))
 			pl := datastore.PropertyList{}
 			if err := SaveStruct(s.Interface(), &pl); err != nil {
 				return err
@@ -442,7 +444,7 @@ func saveMemoryCache(cc *cacheContext, ms *multiState) error {
 	defer cc.Unlock()
 	for i, err := range ms.errs {
 		if err == nil {
-			s := ms.vals.Index(i)
+			s := addrValue(ms.vals.Index(i))
 			pl := datastore.PropertyList{}
 			if err := SaveStruct(s.Interface(), &pl); err != nil {
 				return err
@@ -468,6 +470,7 @@ func lockMemcache(c appengine.Context, ms *multiState) error {
 		item := &memcache.Item{
 			Key:        memcacheKey,
 			Flags:      memcacheLock,
+			Value:      []byte{},
 			Expiration: memcacheLockTime,
 		}
 		lockItems = append(lockItems, item)
