@@ -152,20 +152,6 @@ func GetMultiCache(c appengine.Context,
 	}
 }
 
-func convertToPropertyLists(
-	v reflect.Value) ([]datastore.PropertyList, error) {
-	pls := make([]datastore.PropertyList, v.Len())
-	for i := range pls {
-		pl := datastore.PropertyList{}
-		elem := addrValue(v.Index(i))
-		if err := SaveStruct(elem.Interface(), &pl); err != nil {
-			return nil, err
-		}
-		pls[i] = pl
-	}
-	return pls, nil
-}
-
 func addrValue(v reflect.Value) reflect.Value {
 	if v.Kind() != reflect.Ptr {
 		return v.Addr()
@@ -179,7 +165,7 @@ func setValue(index int, vals reflect.Value, pl *datastore.PropertyList) error {
 	return LoadStruct(elem.Interface(), pl)
 }
 
-type multiState struct {
+type getState struct {
 	keys      []*datastore.Key
 	vals      reflect.Value
 	errs      appengine.MultiError
@@ -195,13 +181,13 @@ type multiState struct {
 	lockedMemcacheKeys map[*datastore.Key]bool
 
 	// These are keys we have locked.
-	lockedMemcacheItems map[string]*memcache.Item
+	lockedMemcacheItegs map[string]*memcache.Item
 
 	missingDatastoreKeys map[*datastore.Key]bool
 }
 
-func newMultiState(keys []*datastore.Key, vals reflect.Value) *multiState {
-	ms := &multiState{
+func newGetState(keys []*datastore.Key, vals reflect.Value) *getState {
+	gs := &getState{
 		keys: keys,
 		vals: vals,
 		errs: make(appengine.MultiError, vals.Len()),
@@ -217,9 +203,9 @@ func newMultiState(keys []*datastore.Key, vals reflect.Value) *multiState {
 	}
 
 	for i, key := range keys {
-		ms.keyIndex[key] = i
+		gs.keyIndex[key] = i
 	}
-	return ms
+	return gs
 }
 
 // getMultiCache attempts to get entities from local cache, memcache, then the
@@ -260,135 +246,135 @@ func newMultiState(keys []*datastore.Key, vals reflect.Value) *multiState {
 func getMultiCache(cc *cacheContext,
 	keys []*datastore.Key, dst reflect.Value) error {
 
-	ms := newMultiState(keys, dst)
+	gs := newGetState(keys, dst)
 
-	if err := loadMemoryCache(cc, ms); err != nil {
+	if err := loadGetMemory(cc, gs); err != nil {
 		return err
 	}
 
-	if err := loadMemcache(cc, ms); err != nil {
+	if err := loadGetMemcache(cc, gs); err != nil {
 		return err
 	}
 
 	// Lock memcache while we get new data from the datastore.
-	if err := lockMemcache(cc, ms); err != nil {
+	if err := lockGetMemcache(cc, gs); err != nil {
 		return err
 	}
 
-	if err := loadDatastore(cc, ms); err != nil {
+	if err := loadGetDatastore(cc, gs); err != nil {
 		return err
 	}
 
-	if err := saveMemcache(cc, ms); err != nil {
+	if err := saveGetMemcache(cc, gs); err != nil {
 		return err
 	}
 
-	if err := saveMemoryCache(cc, ms); err != nil {
+	if err := saveGetMemory(cc, gs); err != nil {
 		return err
 	}
 
-	if ms.errsCount == 0 {
+	if gs.errsCount == 0 {
 		return nil
 	} else {
-		return ms.errs
+		return gs.errs
 	}
 }
 
-func loadMemoryCache(cc *cacheContext, ms *multiState) error {
+func loadGetMemory(cc *cacheContext, gs *getState) error {
 	cc.RLock()
 	defer cc.RUnlock()
 
-	for index, key := range ms.keys {
+	for index, key := range gs.keys {
 		if pl, ok := cc.cache[key]; ok {
 			if len(pl) == 0 {
-				ms.errs[index] = datastore.ErrNoSuchEntity
-				ms.errsCount++
+				gs.errs[index] = datastore.ErrNoSuchEntity
+				gs.errsCount++
 			} else {
-				if err := setValue(index, ms.vals, &pl); err != nil {
+				if err := setValue(index, gs.vals, &pl); err != nil {
 					return err
 				}
 			}
 		} else {
-			ms.errs[index] = datastore.ErrNoSuchEntity
-			ms.errsCount++
-			ms.missingMemoryKeys[key] = true
+			gs.errs[index] = datastore.ErrNoSuchEntity
+			gs.errsCount++
+			gs.missingMemoryKeys[key] = true
 		}
 	}
 	return nil
 }
 
-func loadMemcache(cc *cacheContext, ms *multiState) error {
+func loadGetMemcache(cc *cacheContext, gs *getState) error {
 
-	memcacheKeys := make([]string, 0, len(ms.missingMemoryKeys))
-	for key := range ms.missingMemoryKeys {
+	memcacheKeys := make([]string, 0, len(gs.missingMemoryKeys))
+	for key := range gs.missingMemoryKeys {
 		memcacheKeys = append(memcacheKeys, createMemcacheKey(key))
 	}
 
 	if items, err := memcache.GetMulti(cc, memcacheKeys); err != nil {
 		return err
 	} else {
-		for key := range ms.missingMemoryKeys {
+		for key := range gs.missingMemoryKeys {
 			memcacheKey := createMemcacheKey(key)
 
 			if item, ok := items[memcacheKey]; ok {
 				if isItemLocked(item) {
-					ms.lockedMemcacheKeys[key] = true
+					gs.lockedMemcacheKeys[key] = true
 				} else {
 					if pl, err := decodePropertyList(item.Value); err != nil {
 						return err
 					} else {
-						index := ms.keyIndex[key]
-						if err := setValue(index, ms.vals, &pl); err != nil {
+						index := gs.keyIndex[key]
+						if err := setValue(index, gs.vals, &pl); err != nil {
 							return err
 						}
 
-						ms.errs[index] = nil
-						ms.errsCount--
+						gs.errs[index] = nil
+						gs.errsCount--
 					}
 				}
 			} else {
-				ms.missingMemcacheKeys[key] = true
+				gs.missingMemcacheKeys[key] = true
 			}
 		}
 	}
 	return nil
 }
 
-func loadDatastore(c appengine.Context, ms *multiState) error {
+func loadGetDatastore(c appengine.Context, gs *getState) error {
 
 	keys := make([]*datastore.Key, 0,
-		len(ms.missingMemcacheKeys)+len(ms.lockedMemcacheKeys))
-	for key := range ms.missingMemcacheKeys {
+		len(gs.missingMemcacheKeys)+len(gs.lockedMemcacheKeys))
+	for key := range gs.missingMemcacheKeys {
 		keys = append(keys, key)
 	}
-	for key := range ms.lockedMemcacheKeys {
+	for key := range gs.lockedMemcacheKeys {
 		keys = append(keys, key)
 	}
 	pls := make([]datastore.PropertyList,
-		len(ms.missingMemcacheKeys)+len(ms.lockedMemcacheKeys))
+		len(gs.missingMemcacheKeys)+len(gs.lockedMemcacheKeys))
 
 	if err := datastore.GetMulti(c, keys, pls); err == nil {
 		for i, key := range keys {
-			index := ms.keyIndex[key]
-			if err := setValue(index, ms.vals, &pls[i]); err != nil {
+			index := gs.keyIndex[key]
+			if err := setValue(index, gs.vals, &pls[i]); err != nil {
 				return err
 			}
-			ms.errs[index] = nil
-			ms.errsCount--
+			gs.errs[index] = nil
+			gs.errsCount--
 		}
 	} else if me, ok := err.(appengine.MultiError); ok {
 		for i, err := range me {
 			if err == nil {
 				key := keys[i]
-				index := ms.keyIndex[key]
-				if err := setValue(index, ms.vals, &pls[i]); err != nil {
+				index := gs.keyIndex[key]
+				if err := setValue(index, gs.vals, &pls[i]); err != nil {
 					return err
 				}
-				ms.errs[index] = nil
-				ms.errsCount--
+				gs.errs[index] = nil
+				gs.errsCount--
 			} else if err == datastore.ErrNoSuchEntity {
 				key := keys[i]
-				ms.missingDatastoreKeys[key] = true
+				gs.missingDatastoreKeys[key] = true
 			} else {
 				return err
 			}
@@ -399,14 +385,14 @@ func loadDatastore(c appengine.Context, ms *multiState) error {
 	return nil
 }
 
-func saveMemcache(c appengine.Context, ms *multiState) error {
+func saveGetMemcache(c appengine.Context, gs *getState) error {
 
 	items := []*memcache.Item{}
-	for key := range ms.missingMemcacheKeys {
+	for key := range gs.missingMemcacheKeys {
 		memcacheKey := createMemcacheKey(key)
-		if !ms.missingDatastoreKeys[key] {
-			index := ms.keyIndex[key]
-			s := addrValue(ms.vals.Index(index))
+		if !gs.missingDatastoreKeys[key] {
+			index := gs.keyIndex[key]
+			s := addrValue(gs.vals.Index(index))
 			pl := datastore.PropertyList{}
 			if err := SaveStruct(s.Interface(), &pl); err != nil {
 				return err
@@ -416,7 +402,7 @@ func saveMemcache(c appengine.Context, ms *multiState) error {
 			if err != nil {
 				return err
 			}
-			if item, ok := ms.lockedMemcacheItems[memcacheKey]; ok {
+			if item, ok := gs.lockedMemcacheItegs[memcacheKey]; ok {
 				item.Value = data
 				item.Flags = 0
 				items = append(items, item)
@@ -439,17 +425,17 @@ func saveMemcache(c appengine.Context, ms *multiState) error {
 	}
 }
 
-func saveMemoryCache(cc *cacheContext, ms *multiState) error {
+func saveGetMemory(cc *cacheContext, gs *getState) error {
 	cc.Lock()
 	defer cc.Unlock()
-	for i, err := range ms.errs {
+	for i, err := range gs.errs {
 		if err == nil {
-			s := addrValue(ms.vals.Index(i))
+			s := addrValue(gs.vals.Index(i))
 			pl := datastore.PropertyList{}
 			if err := SaveStruct(s.Interface(), &pl); err != nil {
 				return err
 			}
-			cc.cache[ms.keys[i]] = pl
+			cc.cache[gs.keys[i]] = pl
 		}
 	}
 	return nil
@@ -459,11 +445,11 @@ func isItemLocked(item *memcache.Item) bool {
 	return item.Flags == memcacheLock
 }
 
-func lockMemcache(c appengine.Context, ms *multiState) error {
+func lockGetMemcache(c appengine.Context, gs *getState) error {
 
-	lockItems := make([]*memcache.Item, 0, len(ms.missingMemcacheKeys))
-	memcacheKeys := make([]string, 0, len(ms.missingMemcacheKeys))
-	for key := range ms.missingMemcacheKeys {
+	lockItems := make([]*memcache.Item, 0, len(gs.missingMemcacheKeys))
+	memcacheKeys := make([]string, 0, len(gs.missingMemcacheKeys))
+	for key := range gs.missingMemcacheKeys {
 		memcacheKey := createMemcacheKey(key)
 		memcacheKeys = append(memcacheKeys, memcacheKey)
 
@@ -482,7 +468,7 @@ func lockMemcache(c appengine.Context, ms *multiState) error {
 	if items, err := memcache.GetMulti(c, memcacheKeys); err != nil {
 		return err
 	} else {
-		ms.lockedMemcacheItems = items
+		gs.lockedMemcacheItegs = items
 	}
 	return nil
 }
@@ -511,45 +497,106 @@ func PutMultiCache(c appengine.Context,
 	}
 
 	if cc, ok := c.(*cacheContext); ok {
-		if pls, err := convertToPropertyLists(v); err != nil {
-			return nil, err
-		} else {
-			return putMultiCache(cc, keys, pls)
-		}
+		return putMultiCache(cc, keys, v)
 	} else {
 		return datastore.PutMulti(c, keys, src)
 	}
 }
 
 // putMultiCache puts the entities into the datastore and then its local cache.
+//
+// Warning that errors still need to be sorted out here so that if an error is
+// returned we must be sure that the data did not commit to the datastore. For
+// example, we could convert the src to property lists right at the beginning
+// of the function or we could get rid of the reliance on propertly lists
+// completely.
 func putMultiCache(cc *cacheContext,
-	keys []*datastore.Key,
-	pls []datastore.PropertyList) ([]*datastore.Key, error) {
+	keys []*datastore.Key, src reflect.Value) ([]*datastore.Key, error) {
+
+	lockMemcacheKeys := []string{}
+	lockMemcacheItems := []*memcache.Item{}
+	for _, key := range keys {
+		if !key.Incomplete() {
+			memcacheKey := createMemcacheKey(key)
+			lockMemcacheKeys = append(lockMemcacheKeys, memcacheKey)
+
+			item := &memcache.Item{
+				Key:        memcacheKey,
+				Flags:      memcacheLock,
+				Value:      []byte{},
+				Expiration: memcacheLockTime,
+			}
+			lockMemcacheItems = append(lockMemcacheItems, item)
+		}
+	}
+	if err := memcache.SetMulti(cc, lockMemcacheItems); err != nil {
+		return nil, err
+	}
 
 	// Save to the datastore.
-	completeKeys, err := datastore.PutMulti(cc, keys, pls)
+	keys, err := datastore.PutMulti(cc, keys, src.Interface())
 	if err != nil {
 		return nil, err
 	}
 
-	// Save to local memory cache.
-	putMultiLocalCache(cc, completeKeys, pls)
-
-	return completeKeys, nil
-}
-
-func putLocalCache(cc *cacheContext,
-	key *datastore.Key, pl datastore.PropertyList) {
-	cc.Lock()
-	cc.cache[key] = pl
-	cc.Unlock()
-}
-
-func putMultiLocalCache(cc *cacheContext,
-	keys []*datastore.Key, pls []datastore.PropertyList) {
-	for i, key := range keys {
-		putLocalCache(cc, key, pls[i])
+	// Remove the locks.
+	if err := memcache.DeleteMulti(cc, lockMemcacheKeys); err != nil {
+		if _, ok := err.(appengine.MultiError); !ok {
+			return nil, err
+		}
 	}
+
+	// Save to local memory cache.
+	cc.Lock()
+	defer cc.Unlock()
+	for i, key := range keys {
+		pl := datastore.PropertyList{}
+		elem := addrValue(src.Index(i))
+		if err := SaveStruct(elem.Interface(), &pl); err != nil {
+			return nil, err
+		}
+		cc.cache[key] = pl
+	}
+	return keys, nil
+}
+
+func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
+
+	if cc, ok := c.(*cacheContext); ok {
+		return deleteMulti(cc, keys)
+	} else {
+		return datastore.DeleteMulti(c, keys)
+	}
+}
+
+func deleteMulti(cc *cacheContext, keys []*datastore.Key) error {
+	lockMemcacheItems := []*memcache.Item{}
+	for _, key := range keys {
+		// TODO: Could possibly check for incomplete key here.
+		memcacheKey := createMemcacheKey(key)
+
+		item := &memcache.Item{
+			Key:        memcacheKey,
+			Flags:      memcacheLock,
+			Value:      []byte{},
+			Expiration: memcacheLockTime,
+		}
+		lockMemcacheItems = append(lockMemcacheItems, item)
+	}
+	if err := memcache.SetMulti(cc, lockMemcacheItems); err != nil {
+		return err
+	}
+
+	if err := datastore.DeleteMulti(cc, keys); err != nil {
+		return err
+	}
+
+	cc.Lock()
+	for _, key := range keys {
+		delete(cc.cache, key)
+	}
+	cc.Unlock()
+	return nil
 }
 
 // SaveStruct saves src to a datastore.PropertyList.

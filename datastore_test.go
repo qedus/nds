@@ -195,12 +195,18 @@ func TestMultiCache(t *testing.T) {
 	}
 
 	// Save every other entity.
+	putKeys := []*datastore.Key{}
+	putEntities := []*testEntity{}
 	for i, key := range keys {
 		if i%2 == 0 {
-			if _, err := datastore.Put(c, key, entities[i]); err != nil {
-				t.Fatal(err)
-			}
+			putKeys = append(putKeys, key)
+			putEntities = append(putEntities, entities[i])
 		}
+	}
+	if keys, err := nds.PutMultiCache(cc, putKeys, putEntities); err != nil {
+		t.Fatal(err)
+	} else if len(keys) != len(putKeys) {
+		t.Fatal("incorrect key len")
 	}
 
 	// Get from datastore.
