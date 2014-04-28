@@ -4,6 +4,7 @@ import (
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
+	"fmt"
 	"github.com/qedus/nds"
 	"strconv"
 	"testing"
@@ -212,7 +213,12 @@ func TestMultiCache(t *testing.T) {
 
 	me, ok := err.(appengine.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T", me)
+		t.Fatalf("not an appengine.MultiError: %+T, %s", err, err)
+	}
+
+	fmt.Println("respEntites", respEntities)
+	for i, e := range me {
+		fmt.Println(i, e)
 	}
 
 	// Check respEntities are in order.
@@ -223,7 +229,7 @@ func TestMultiCache(t *testing.T) {
 					entities[i].Val)
 			}
 			if me[i] != nil {
-				t.Fatal("should be nil error")
+				t.Fatalf("should be nil error: %s", me[i])
 			}
 		} else {
 			if re.Val != 0 {

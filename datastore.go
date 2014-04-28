@@ -4,10 +4,13 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 )
 
 const (
@@ -15,7 +18,17 @@ const (
 	// that can be PutMulti or GetMulti in one call.
 	multiLimit = 1000
 
+	// memcachePrefix is the namespace memcache uses to store entities.
 	memcachePrefix = "NDS:"
+
+	// memcacheLockTime is the maximum length of time a memcache lock will be
+	// held for. 32 seconds is choosen as 30 seconds is the maximum amount of
+	// time an underlying datastore call will retry even if the API reports a
+	// success to the user.
+	memcacheLockTime = 32 * time.Second
+
+	// memcacheLock is the value that is used to lock memcache.
+	memcacheLock = uint32(1)
 )
 
 var (
@@ -109,17 +122,21 @@ func GetMulti(c appengine.Context,
 
 type cacheContext struct {
 	appengine.Context
-	cache map[string]datastore.PropertyList
+	cache map[*datastore.Key]datastore.PropertyList
 	sync.RWMutex
 }
 
+// NewCacheContext returns an appengine.Context that allows GetMultiCache to
+// use local memory cache and memcache.
 func NewCacheContext(c appengine.Context) appengine.Context {
 	return &cacheContext{
 		Context: c,
-		cache:   map[string]datastore.PropertyList{},
+		cache:   map[*datastore.Key]datastore.PropertyList{},
 	}
 }
 
+// GetMultiCache works like datastore.GetMulti except it tries to retrieve
+// data from local memory cache and memcache when a NewCacheContext is used.
 func GetMultiCache(c appengine.Context,
 	keys []*datastore.Key, dst interface{}) error {
 
@@ -157,79 +174,219 @@ func addrValue(v reflect.Value) reflect.Value {
 	}
 }
 
-// getMultiCache gets entities from local cache then the datastore.
+func setVal(index int, vals reflect.Value, pl *datastore.PropertyList) error {
+	elem := addrValue(vals.Index(index))
+	return LoadStruct(elem.Interface(), pl)
+}
+
+type multiState struct {
+	keys      []*datastore.Key
+	vals      reflect.Value
+	errs      appengine.MultiError
+	errsCount int
+
+	keyIndexes map[*datastore.Key]int
+
+	missingMemoryKeys map[*datastore.Key]bool
+
+	missingMemcacheKeys map[*datastore.Key]bool
+
+	// These are keys someone else has locked.
+	lockedMemcacheKeys map[*datastore.Key]bool
+
+	// These are keys we have locked.
+	lockedMemcacheItems map[string]*memcache.Item
+
+	missingDatastoreKeys map[*datastore.Key]bool
+}
+
+func newMultiState(keys []*datastore.Key, vals reflect.Value) *multiState {
+	ms := &multiState{
+		keys: keys,
+		vals: vals,
+		errs: make(appengine.MultiError, vals.Len()),
+
+		keyIndexes: make(map[*datastore.Key]int),
+
+		missingMemoryKeys: make(map[*datastore.Key]bool),
+
+		missingMemcacheKeys: make(map[*datastore.Key]bool),
+		lockedMemcacheKeys:  make(map[*datastore.Key]bool),
+
+		missingDatastoreKeys: make(map[*datastore.Key]bool),
+	}
+
+	for i, key := range keys {
+		ms.keyIndexes[key] = i
+	}
+	return ms
+}
+
+// getMultiCache attempts to get entities from local cache, memcache, then the
+// datastore. It also tries to replenish each cache in turn if an entity is
+// available.
+// The not so obvious part is replenishing memcache with the datastore to
+// ensure we don't write stale values.
+//
+// Here's how it works assuming there is nothing in local cache. (Note this is
+// taken form Python ndb):
+// Firstly get as many entities from memcache as possible. The returned values
+// can be in one of three states: No entity, locked value or the acutal entity.
+//
+// Actual entity case:
+// If the value from memcache is an actual entity then replensish the local
+// cache and return that entity to the caller.
+//
+// Locked entity case:
+// If the value is locked then just ignore that entity and go to the datastore
+// to see if it exists.
+//
+// No entity case:
+// If no entity is returned from memcache then do the following things to ensure
+// we don't accidentally update memcache with stale values.
+// 1) Lock that entity in memcache by setting memcacheLock on that entities key.
+//    Note that the lock timeout is 32 seconds to cater for a datastore edge
+//    case which I currently can't quite remember.
+// 2) Immediately get that entity back from memcache ensuring the compare and
+//    swap ID is set.
+// 3) Get the entity from the datastore.
+// 4) Set the entity in memcache using compare and swap. If this succeeds then
+//    we are guaranteed to have the latest value in memcache. If it fails due
+//    to a CAS failure then there must have been a concurrent write to
+//    memcache and now the memcache for that key is out of action for 32
+//    seconds.
+//
 // dst argument must be a slice.
 func getMultiCache(cc *cacheContext,
 	keys []*datastore.Key, dst reflect.Value) error {
 
-	cacheMissIndexes := []int{}
-	cacheMissKeys := []*datastore.Key{}
-	cacheMissDsts := []datastore.PropertyList{}
+	ms := newMultiState(keys, dst)
 
-	errs := make(appengine.MultiError, dst.Len())
-	errsNil := true
+	if err := loadMemoryCache(cc, ms); err != nil {
+		return err
+	}
 
-	// Load from local memory cache.
+	if err := loadMemcache(cc, ms); err != nil {
+		return err
+	}
+
+	// Lock memcache while we get new data from the datastore.
+	if err := lockMemcache(cc, ms); err != nil {
+		return err
+	}
+
+	if err := loadDatastore(cc, ms); err != nil {
+		return err
+	}
+
+	if err := saveMemcache(cc, ms); err != nil {
+		return err
+	}
+
+	if err := saveMemoryCache(cc, ms); err != nil {
+		return err
+	}
+
+	if ms.errsCount == 0 {
+		return nil
+	} else {
+		return ms.errs
+	}
+}
+
+func loadMemoryCache(cc *cacheContext, ms *multiState) error {
 	cc.RLock()
-	for i, key := range keys {
-		if pl, ok := cc.cache[key.Encode()]; ok {
+	defer cc.RUnlock()
+
+	for index, key := range ms.keys {
+		if pl, ok := cc.cache[key]; ok {
 			if len(pl) == 0 {
-				errs[i] = datastore.ErrNoSuchEntity
-				errsNil = false
+				ms.errs[index] = datastore.ErrNoSuchEntity
+				ms.errsCount++
 			} else {
-				elem := addrValue(dst.Index(i))
-				if err := LoadStruct(elem.Interface(), &pl); err != nil {
-					cc.RUnlock()
+				if err := setVal(index, ms.vals, &pl); err != nil {
 					return err
 				}
 			}
 		} else {
-			cacheMissIndexes = append(cacheMissIndexes, i)
-			cacheMissKeys = append(cacheMissKeys, key)
-			cacheMissDsts = append(cacheMissDsts, datastore.PropertyList{})
+			ms.missingMemoryKeys[key] = true
 		}
 	}
-	cc.RUnlock()
+	return nil
+}
 
-	// Load from memcache.
-	memcacheKeys := createMemcacheKeys(cacheMissKeys)
-	if _, err := memcache.GetMulti(cc, memcacheKeys); err != nil {
-		return err
-	} else {
+func loadMemcache(cc *cacheContext, ms *multiState) error {
 
+	memcacheKeys := make([]string, 0, len(ms.missingMemoryKeys))
+	for key := range ms.missingMemoryKeys {
+		memcacheKeys = append(memcacheKeys, createMemcacheKey(key))
 	}
 
-	// Load from datastore.
-	if err := datastore.GetMulti(cc, cacheMissKeys, cacheMissDsts); err == nil {
-		// Save to local memory cache.
-		putMultiLocalCache(cc, cacheMissKeys, cacheMissDsts)
+	if items, err := memcache.GetMulti(cc, memcacheKeys); err != nil {
+		return err
+	} else {
+		for key := range ms.missingMemoryKeys {
+			memcacheKey := createMemcacheKey(key)
 
-		// Update the callers slice with values.
-		for i, index := range cacheMissIndexes {
-			pl := cacheMissDsts[i]
-			elem := addrValue(dst.Index(index))
-			if err := LoadStruct(elem.Interface(), &pl); err != nil {
+			if item, ok := items[memcacheKey]; ok {
+				if isItemLocked(item) {
+					ms.lockedMemcacheKeys[key] = true
+				} else {
+					if pl, err := decodePropertyList(item.Value); err != nil {
+						return err
+					} else {
+						index := ms.keyIndexes[key]
+						if err := setVal(index, ms.vals, &pl); err != nil {
+							return err
+						}
+
+						ms.errs[index] = nil
+						ms.errsCount--
+					}
+				}
+			} else {
+				ms.missingMemcacheKeys[key] = true
+			}
+		}
+	}
+	return nil
+}
+
+func loadDatastore(c appengine.Context, ms *multiState) error {
+
+	keys := make([]*datastore.Key, 0,
+		len(ms.missingMemcacheKeys)+len(ms.lockedMemcacheKeys))
+	for key := range ms.missingMemcacheKeys {
+		keys = append(keys, key)
+	}
+	for key := range ms.lockedMemcacheKeys {
+		keys = append(keys, key)
+	}
+	pls := make([]datastore.PropertyList,
+		len(ms.missingMemcacheKeys)+len(ms.lockedMemcacheKeys))
+
+	if err := datastore.GetMulti(c, keys, pls); err == nil {
+		for i, key := range keys {
+			index := ms.keyIndexes[key]
+			if err := setVal(index, ms.vals, &pls[i]); err != nil {
 				return err
 			}
+			ms.errs[index] = nil
+			ms.errsCount--
 		}
 	} else if me, ok := err.(appengine.MultiError); ok {
 		for i, err := range me {
 			if err == nil {
-				putLocalCache(cc, cacheMissKeys[i], cacheMissDsts[i])
-
-				// Update the callers slice with values.
-				pl := cacheMissDsts[i]
-				index := cacheMissIndexes[i]
-				elem := addrValue(dst.Index(index))
-				if err := LoadStruct(elem.Interface(), &pl); err != nil {
+				key := keys[i]
+				index := ms.keyIndexes[key]
+				if err := setVal(index, ms.vals, &pls[i]); err != nil {
 					return err
 				}
+				ms.errs[index] = nil
+				ms.errsCount--
 			} else if err == datastore.ErrNoSuchEntity {
-				putLocalCache(cc, cacheMissKeys[i], nil)
-				index := cacheMissIndexes[i]
-				errs[index] = datastore.ErrNoSuchEntity
-				errsNil = false
-				// Possibly should zero the callers slice value here.
+				key := keys[i]
+				ms.missingDatastoreKeys[key] = true
 			} else {
 				return err
 			}
@@ -237,20 +394,109 @@ func getMultiCache(cc *cacheContext,
 	} else {
 		return err
 	}
+	return nil
+}
 
-	if errsNil {
+func saveMemcache(c appengine.Context, ms *multiState) error {
+
+	items := []*memcache.Item{}
+	for key := range ms.missingMemcacheKeys {
+		memcacheKey := createMemcacheKey(key)
+		if !ms.missingDatastoreKeys[key] {
+			index := ms.keyIndexes[key]
+			s := ms.vals.Index(index)
+			pl := datastore.PropertyList{}
+			if err := SaveStruct(s.Interface(), &pl); err != nil {
+				return err
+			}
+
+			data, err := encodePropertyList(pl)
+			if err != nil {
+				return err
+			}
+			if item, ok := ms.lockedMemcacheItems[memcacheKey]; ok {
+				item.Value = data
+				item.Flags = 0
+				items = append(items, item)
+			} else {
+				item := &memcache.Item{
+					Key:   memcacheKey,
+					Value: data,
+				}
+				items = append(items, item)
+			}
+		}
+	}
+	if err := memcache.CompareAndSwapMulti(
+		c, items); err == memcache.ErrCASConflict {
+		return nil
+	} else if err == memcache.ErrNotStored {
 		return nil
 	} else {
-		return errs
+		return err
 	}
 }
 
-func createMemcacheKeys(keys []*datastore.Key) []string {
-	memcacheKeys := make([]string, len(keys))
-	for i, key := range keys {
-		memcacheKeys[i] = fmt.Sprintf("%s%s", memcachePrefix, key.Encode())
+func saveMemoryCache(cc *cacheContext, ms *multiState) error {
+	cc.Lock()
+	defer cc.Unlock()
+	for i, err := range ms.errs {
+		if err == nil {
+			s := ms.vals.Index(i)
+			pl := datastore.PropertyList{}
+			if err := SaveStruct(s.Interface(), &pl); err != nil {
+				return err
+			}
+			cc.cache[ms.keys[i]] = pl
+		}
 	}
-	return memcacheKeys
+	return nil
+}
+
+func isItemLocked(item *memcache.Item) bool {
+	return item.Flags == memcacheLock
+}
+
+func lockMemcache(c appengine.Context, ms *multiState) error {
+
+	lockItems := make([]*memcache.Item, 0, len(ms.missingMemcacheKeys))
+	memcacheKeys := make([]string, 0, len(ms.missingMemcacheKeys))
+	for key := range ms.missingMemcacheKeys {
+		memcacheKey := createMemcacheKey(key)
+		memcacheKeys = append(memcacheKeys, memcacheKey)
+
+		item := &memcache.Item{
+			Key:        memcacheKey,
+			Flags:      memcacheLock,
+			Expiration: memcacheLockTime,
+		}
+		lockItems = append(lockItems, item)
+	}
+	if err := memcache.SetMulti(c, lockItems); err != nil {
+		return err
+	}
+
+	if items, err := memcache.GetMulti(c, memcacheKeys); err != nil {
+		return err
+	} else {
+		ms.lockedMemcacheItems = items
+	}
+	return nil
+}
+
+func decodePropertyList(data []byte) (datastore.PropertyList, error) {
+	pl := datastore.PropertyList{}
+	return pl, gob.NewDecoder(bytes.NewBuffer(data)).Decode(&pl)
+}
+
+func encodePropertyList(pl datastore.PropertyList) ([]byte, error) {
+	b := &bytes.Buffer{}
+	err := gob.NewEncoder(b).Encode(pl)
+	return b.Bytes(), err
+}
+
+func createMemcacheKey(key *datastore.Key) string {
+	return fmt.Sprintf("%s%s", memcachePrefix, key.Encode())
 }
 
 func PutMultiCache(c appengine.Context,
@@ -292,7 +538,7 @@ func putMultiCache(cc *cacheContext,
 func putLocalCache(cc *cacheContext,
 	key *datastore.Key, pl datastore.PropertyList) {
 	cc.Lock()
-	cc.cache[key.Encode()] = pl
+	cc.cache[key] = pl
 	cc.Unlock()
 }
 
