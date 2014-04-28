@@ -174,7 +174,7 @@ func addrValue(v reflect.Value) reflect.Value {
 	}
 }
 
-func setVal(index int, vals reflect.Value, pl *datastore.PropertyList) error {
+func setValue(index int, vals reflect.Value, pl *datastore.PropertyList) error {
 	elem := addrValue(vals.Index(index))
 	return LoadStruct(elem.Interface(), pl)
 }
@@ -304,7 +304,7 @@ func loadMemoryCache(cc *cacheContext, ms *multiState) error {
 				ms.errs[index] = datastore.ErrNoSuchEntity
 				ms.errsCount++
 			} else {
-				if err := setVal(index, ms.vals, &pl); err != nil {
+				if err := setValue(index, ms.vals, &pl); err != nil {
 					return err
 				}
 			}
@@ -338,7 +338,7 @@ func loadMemcache(cc *cacheContext, ms *multiState) error {
 						return err
 					} else {
 						index := ms.keyIndex[key]
-						if err := setVal(index, ms.vals, &pl); err != nil {
+						if err := setValue(index, ms.vals, &pl); err != nil {
 							return err
 						}
 
@@ -370,7 +370,7 @@ func loadDatastore(c appengine.Context, ms *multiState) error {
 	if err := datastore.GetMulti(c, keys, pls); err == nil {
 		for i, key := range keys {
 			index := ms.keyIndex[key]
-			if err := setVal(index, ms.vals, &pls[i]); err != nil {
+			if err := setValue(index, ms.vals, &pls[i]); err != nil {
 				return err
 			}
 			ms.errs[index] = nil
@@ -381,7 +381,7 @@ func loadDatastore(c appengine.Context, ms *multiState) error {
 			if err == nil {
 				key := keys[i]
 				index := ms.keyIndex[key]
-				if err := setVal(index, ms.vals, &pls[i]); err != nil {
+				if err := setValue(index, ms.vals, &pls[i]); err != nil {
 					return err
 				}
 				ms.errs[index] = nil
