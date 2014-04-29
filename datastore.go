@@ -327,8 +327,6 @@ func loadGetMemory(cc *cacheContext, gs *getState) error {
 				}
 			}
 		} else {
-			gs.errs[index] = datastore.ErrNoSuchEntity
-			gs.errsCount++
 			gs.missingMemoryKeys[key] = true
 		}
 	}
@@ -397,16 +395,17 @@ func loadGetDatastore(c appengine.Context, gs *getState) error {
 	} else if me, ok := err.(appengine.MultiError); ok {
 		for i, err := range me {
 			if err == nil {
-				key := keys[i]
-				index := gs.keyIndex[key]
+				index := gs.keyIndex[keys[i]]
 				if err := setValue(index, gs.vals, &pls[i]); err != nil {
 					return err
 				}
 				gs.errs[index] = nil
 				gs.errsCount--
 			} else if err == datastore.ErrNoSuchEntity {
-				key := keys[i]
-				gs.missingDatastoreKeys[key] = true
+				index := gs.keyIndex[keys[i]]
+				gs.errs[index] = datastore.ErrNoSuchEntity
+				gs.errsCount++
+				gs.missingDatastoreKeys[keys[i]] = true
 			} else {
 				return err
 			}

@@ -21,7 +21,7 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 	}
 
 	// Test no such entity.
-	for _, count := range []int{999, 1000, 1001, 5000, 5001} {
+	for _, count := range []int{999, 1000, 1001} {
 
 		keys := []*datastore.Key{}
 		entities := []*testEntity{}
@@ -56,7 +56,7 @@ func TestGetMultiNoErrors(t *testing.T) {
 		Val int
 	}
 
-	for _, count := range []int{999, 1000, 1001, 5000, 5001} {
+	for _, count := range []int{999, 1000, 1001} {
 
 		// Create entities.
 		keys := []*datastore.Key{}
@@ -104,7 +104,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 		Val int
 	}
 
-	for _, count := range []int{999, 1000, 1001, 5000, 5001} {
+	for _, count := range []int{999, 1000, 1001} {
 
 		// Create entities.
 		keys := []*datastore.Key{}
