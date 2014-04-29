@@ -149,28 +149,6 @@ func TestGetMultiErrorMix(t *testing.T) {
 	}
 }
 
-func TestLoadSaveStruct(t *testing.T) {
-	type Test struct {
-		Value string
-	}
-	saveEntity := &Test{Value: "one"}
-	pl := datastore.PropertyList{}
-	if err := nds.SaveStruct(saveEntity, &pl); err != nil {
-		t.Fatal(err)
-	}
-	if len(pl) != 1 {
-		t.Fatal("incorrect pl size")
-	}
-
-	loadEntity := &Test{}
-	if err := nds.LoadStruct(loadEntity, &pl); err != nil {
-		t.Fatal(err)
-	}
-	if loadEntity.Value != "one" {
-		t.Fatal("incorrect loadEntity.Value")
-	}
-}
-
 func TestMultiCache(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {

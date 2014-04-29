@@ -184,7 +184,7 @@ func addrValue(v reflect.Value) reflect.Value {
 
 func setValue(index int, vals reflect.Value, pl *datastore.PropertyList) error {
 	elem := addrValue(vals.Index(index))
-	return LoadStruct(elem.Interface(), pl)
+	return loadStruct(elem.Interface(), pl)
 }
 
 type getMultiState struct {
@@ -420,7 +420,7 @@ func saveMemcache(c appengine.Context, gs *getMultiState) error {
 			index := gs.keyIndex[key]
 			s := addrValue(gs.vals.Index(index))
 			pl := datastore.PropertyList{}
-			if err := SaveStruct(s.Interface(), &pl); err != nil {
+			if err := saveStruct(s.Interface(), &pl); err != nil {
 				return err
 			}
 
@@ -458,7 +458,7 @@ func saveMemory(cc *context, gs *getMultiState) error {
 		if err == nil {
 			s := addrValue(gs.vals.Index(i))
 			pl := datastore.PropertyList{}
-			if err := SaveStruct(s.Interface(), &pl); err != nil {
+			if err := saveStruct(s.Interface(), &pl); err != nil {
 				return err
 			}
 			cc.cache[gs.keys[i].Encode()] = pl
@@ -593,7 +593,7 @@ func putMulti(cc *context,
 	for i, key := range keys {
 		pl := datastore.PropertyList{}
 		elem := addrValue(src.Index(i))
-		if err := SaveStruct(elem.Interface(), &pl); err != nil {
+		if err := saveStruct(elem.Interface(), &pl); err != nil {
 			return nil, err
 		}
 		cc.cache[key.Encode()] = pl
@@ -674,8 +674,8 @@ func runInTransaction(cc *context, f func(tc appengine.Context) error,
 	}, opts)
 }
 
-// SaveStruct saves src to a datastore.PropertyList.
-func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
+// saveStruct saves src to a datastore.PropertyList.
+func saveStruct(src interface{}, pl *datastore.PropertyList) error {
 	c, err := make(chan datastore.Property), make(chan error)
 	go func() {
 		err <- datastore.SaveStruct(src, c)
@@ -686,8 +686,8 @@ func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
 	return <-err
 }
 
-// LoadStruct loads a datastore.PropertyList into dst.
-func LoadStruct(dst interface{}, pl *datastore.PropertyList) error {
+// loadStruct loads a datastore.PropertyList into dst.
+func loadStruct(dst interface{}, pl *datastore.PropertyList) error {
 	c := make(chan datastore.Property)
 	go func() {
 		for _, p := range *pl {
