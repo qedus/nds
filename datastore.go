@@ -6,6 +6,7 @@ import (
 	"appengine/memcache"
 	"bytes"
 	"encoding/gob"
+    "fmt"
 	"errors"
 	"reflect"
 	"sync"
@@ -83,10 +84,11 @@ func GetMulti(c appengine.Context,
 	callCount := (len(keys)-1)/getMultiLimit + 1
 	errs := make([]error, callCount)
 
+    fmt.Println("Call started")
 	wg := sync.WaitGroup{}
 	wg.Add(callCount)
 	for i := 0; i < callCount; i++ {
-		lo := i * callCount
+		lo := i * getMultiLimit
 		hi := (i + 1) * getMultiLimit
 		if hi > len(keys) {
 			hi = len(keys)
@@ -97,6 +99,7 @@ func GetMulti(c appengine.Context,
 
 		go func(index int) {
 			// Default to datastore.GetMulti if we do not get a nds.context.
+            fmt.Println("Getting this many entities", len(keySlice), lo, hi)
 			if cc, ok := c.(*context); ok {
 				errs[index] = getMulti(cc, keySlice, dstSlice)
 			} else {
@@ -107,6 +110,7 @@ func GetMulti(c appengine.Context,
 		}(i)
 	}
 	wg.Wait()
+    fmt.Println("Call ended")
 
 	// Quick escape if all errors are nil.
 	errsNil := true
