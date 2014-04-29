@@ -14,15 +14,15 @@ import (
 )
 
 const (
-	// getMultiLimit is the App Engine datastore limit for the maximum number 
-    // of entities that can be got by datastore.GetMulti at once.
-    // nds.GetMulti increases this limit by performing as many
-    // datastore.GetMulti as required concurrently and collating the results.
+	// getMultiLimit is the App Engine datastore limit for the maximum number
+	// of entities that can be got by datastore.GetMulti at once.
+	// nds.GetMulti increases this limit by performing as many
+	// datastore.GetMulti as required concurrently and collating the results.
 	getMultiLimit = 1000
 
-    // putMultiLimit is the App Engine datastore limit for the maximum number
-    // of entities that can be put by the datastore.PutMulti at once.
-    putMultiLimit = 500
+	// putMultiLimit is the App Engine datastore limit for the maximum number
+	// of entities that can be put by the datastore.PutMulti at once.
+	putMultiLimit = 500
 
 	// memcachePrefix is the namespace memcache uses to store entities.
 	memcachePrefix = "NDS0:"
