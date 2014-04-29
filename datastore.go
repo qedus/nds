@@ -209,7 +209,7 @@ type getState struct {
 	lockedMemcacheKeys map[*datastore.Key]bool
 
 	// These are keys we have locked.
-	lockedMemcacheItegs map[string]*memcache.Item
+	lockedMemcacheItems map[string]*memcache.Item
 
 	missingDatastoreKeys map[*datastore.Key]bool
 }
@@ -434,7 +434,7 @@ func saveGetMemcache(c appengine.Context, gs *getState) error {
 			if err != nil {
 				return err
 			}
-			if item, ok := gs.lockedMemcacheItegs[memcacheKey]; ok {
+			if item, ok := gs.lockedMemcacheItems[memcacheKey]; ok {
 				item.Value = data
 				item.Flags = 0
 				items = append(items, item)
@@ -500,7 +500,7 @@ func lockGetMemcache(c appengine.Context, gs *getState) error {
 	if items, err := memcache.GetMulti(c, memcacheKeys); err != nil {
 		return err
 	} else {
-		gs.lockedMemcacheItegs = items
+		gs.lockedMemcacheItems = items
 	}
 	return nil
 }
