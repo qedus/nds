@@ -38,7 +38,7 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 			}
 			for _, e := range me {
 				if e != datastore.ErrNoSuchEntity {
-					t.Fatal(e)
+					t.Fatal("expecting datastore.ErrNoSuchEntity but got", e)
 				}
 			}
 		}

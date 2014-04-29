@@ -36,12 +36,6 @@ const (
 	memcacheLock = uint32(1)
 )
 
-var (
-	// milMultiError is a convenience slice used to represent a nil error when
-	// grouping errors in GetMulti.
-	nilMultiError = make(appengine.MultiError, getMultiLimit)
-)
-
 func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	if v.Kind() != reflect.Slice {
 		return errors.New("nds: dst is not a slice")
@@ -73,31 +67,25 @@ func GetMulti(c appengine.Context,
 		return nil
 	}
 
-	p := len(keys) / getMultiLimit
-	errs := make([]error, p+1)
+	callCount := (len(keys)-1)/getMultiLimit + 1
+	errs := make([]error, callCount)
+
 	wg := sync.WaitGroup{}
-	for i := 0; i < p; i++ {
-		index := i
-		keySlice := keys[i*getMultiLimit : (i+1)*getMultiLimit]
-		dstSlice := v.Slice(i*getMultiLimit, (i+1)*getMultiLimit)
+	wg.Add(callCount)
+	for i := 0; i < callCount; i++ {
+		lo := i * callCount
+		hi := (i + 1) * getMultiLimit
+		if hi > len(keys) {
+			hi = len(keys)
+		}
 
-		wg.Add(1)
-		go func() {
-			errs[index] = datastore.GetMulti(c, keySlice, dstSlice.Interface())
-			wg.Done()
-		}()
-	}
+		keySlice := keys[lo:hi]
+		dstSlice := v.Slice(lo, hi).Interface()
 
-	if len(keys)%getMultiLimit == 0 {
-		errs = errs[:len(errs)-1]
-	} else {
-		keySlice := keys[p*getMultiLimit : len(keys)]
-		dstSlice := v.Slice(p*getMultiLimit, len(keys))
-		wg.Add(1)
-		go func() {
-			errs[p] = datastore.GetMulti(c, keySlice, dstSlice.Interface())
+		go func(index int) {
+			errs[index] = datastore.GetMulti(c, keySlice, dstSlice)
 			wg.Done()
-		}()
+		}(i)
 	}
 	wg.Wait()
 
@@ -112,17 +100,20 @@ func GetMulti(c appengine.Context,
 		return nil
 	}
 
-	groupedErrs := make(appengine.MultiError, 0, len(keys))
-	for _, err := range errs {
-		if err == nil {
-			groupedErrs = append(groupedErrs, nilMultiError...)
-		} else if me, ok := err.(appengine.MultiError); ok {
-			groupedErrs = append(groupedErrs, me...)
-		} else {
+	groupedErrs := make(appengine.MultiError, len(keys))
+	for i, err := range errs {
+		lo := i * len(errs)
+		hi := (i + 1) * getMultiLimit
+		if hi > len(keys) {
+			hi = len(keys)
+		}
+		if me, ok := err.(appengine.MultiError); ok {
+			copy(groupedErrs[lo:hi], me)
+		} else if err != nil {
 			return err
 		}
 	}
-	return groupedErrs[:len(keys)]
+	return groupedErrs
 }
 
 type cacheContext struct {
