@@ -211,7 +211,7 @@ func TestMultiCache(t *testing.T) {
 
 	// Get from datastore.
 	respEntities := make([]testEntity, len(keys))
-	err = nds.GetMultiCache(cc, keys, respEntities)
+	err = nds.GetMulti(cc, keys, respEntities)
 	if err == nil {
 		t.Fatal("should be errors")
 	}
@@ -244,7 +244,7 @@ func TestMultiCache(t *testing.T) {
 
 	// Get from local cache.
 	respEntities = make([]testEntity, len(keys))
-	err = nds.GetMultiCache(cc, keys, respEntities)
+	err = nds.GetMulti(cc, keys, respEntities)
 	if err == nil {
 		t.Fatal("should be errors")
 	}
@@ -278,7 +278,7 @@ func TestMultiCache(t *testing.T) {
 	// Get from memcache.
 	cc = nds.NewContext(c)
 	respEntities = make([]testEntity, len(keys))
-	err = nds.GetMultiCache(cc, keys, respEntities)
+	err = nds.GetMulti(cc, keys, respEntities)
 	if err == nil {
 		t.Fatal("should be errors")
 	}

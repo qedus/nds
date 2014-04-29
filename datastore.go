@@ -80,10 +80,16 @@ func GetMulti(c appengine.Context,
 		}
 
 		keySlice := keys[lo:hi]
-		dstSlice := v.Slice(lo, hi).Interface()
+		dstSlice := v.Slice(lo, hi)
 
 		go func(index int) {
-			errs[index] = datastore.GetMulti(c, keySlice, dstSlice)
+			// Default to datastore.GetMulti if we do not get a nds.context.
+			if cc, ok := c.(*context); ok {
+				errs[index] = getMultiCache(cc, keySlice, dstSlice)
+			} else {
+				errs[index] = datastore.GetMulti(c,
+					keySlice, dstSlice.Interface())
+			}
 			wg.Done()
 		}(i)
 	}
@@ -146,25 +152,8 @@ func NewContext(c appengine.Context) appengine.Context {
 	}
 }
 
-// GetMultiCache works like datastore.GetMulti except it tries to retrieve
-// data from local memory cache and memcache when a NewCacheContext is used.
-func GetMultiCache(c appengine.Context,
-	keys []*datastore.Key, dst interface{}) error {
-
-	v := reflect.ValueOf(dst)
-	if err := checkMultiArgs(keys, v); err != nil {
-		return err
-	}
-
-	if cc, ok := c.(*context); ok {
-		return getMultiCache(cc, keys, v)
-	} else {
-		return datastore.GetMulti(c, keys, dst)
-	}
-}
-
 func GetCache(c appengine.Context, key *datastore.Key, dst interface{}) error {
-	err := GetMultiCache(c, []*datastore.Key{key}, []interface{}{dst})
+	err := GetMulti(c, []*datastore.Key{key}, []interface{}{dst})
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
 	}
