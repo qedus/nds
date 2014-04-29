@@ -539,9 +539,6 @@ func PutCache(c appengine.Context,
 	key *datastore.Key, src interface{}) (*datastore.Key, error) {
 	k, err := PutMultiCache(c, []*datastore.Key{key}, []interface{}{src})
 	if err != nil {
-		if me, ok := err.(appengine.MultiError); ok {
-			return nil, me[0]
-		}
 		return nil, err
 	}
 	return k[0], nil
