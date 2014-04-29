@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -135,8 +134,10 @@ type cacheContext struct {
 	*sync.RWMutex
 
 	// cache is the memory cache for entities. This could probably be changed
-	// to map[*datastore.Key]interface{} in future versions.
-	cache map[*datastore.Key]datastore.PropertyList
+	// to map[string]interface{} in future versions so we don't rely on
+	// datastore.PropertyList.
+	// The string key is the datastore.Key.Encode() value.
+	cache map[string]datastore.PropertyList
 
 	// inTransaction is used to notify our GetMulti, PutMulti and DeleteMulti
 	// functions that we are in a transaction as their memory and memcache
@@ -150,7 +151,7 @@ func NewContext(c appengine.Context) appengine.Context {
 	return &cacheContext{
 		Context: c,
 		RWMutex: &sync.RWMutex{},
-		cache:   map[*datastore.Key]datastore.PropertyList{},
+		cache:   map[string]datastore.PropertyList{},
 	}
 }
 
@@ -316,7 +317,7 @@ func loadGetMemory(cc *cacheContext, gs *getState) error {
 	defer cc.RUnlock()
 
 	for index, key := range gs.keys {
-		if pl, ok := cc.cache[key]; ok {
+		if pl, ok := cc.cache[key.Encode()]; ok {
 			if len(pl) == 0 {
 				gs.errs[index] = datastore.ErrNoSuchEntity
 				gs.errsCount++
@@ -466,7 +467,7 @@ func saveGetMemory(cc *cacheContext, gs *getState) error {
 			if err := SaveStruct(s.Interface(), &pl); err != nil {
 				return err
 			}
-			cc.cache[gs.keys[i]] = pl
+			cc.cache[gs.keys[i].Encode()] = pl
 		}
 	}
 	return nil
@@ -516,7 +517,7 @@ func encodePropertyList(pl datastore.PropertyList) ([]byte, error) {
 }
 
 func createMemcacheKey(key *datastore.Key) string {
-	return fmt.Sprintf("%s%s", memcachePrefix, key.Encode())
+	return memcachePrefix + key.Encode()
 }
 
 func PutMultiCache(c appengine.Context,
@@ -600,8 +601,9 @@ func putMultiCache(cc *cacheContext,
 		if err := SaveStruct(elem.Interface(), &pl); err != nil {
 			return nil, err
 		}
-		cc.cache[key] = pl
+		cc.cache[key.Encode()] = pl
 	}
+
 	return keys, nil
 }
 
@@ -641,7 +643,7 @@ func deleteMultiCache(cc *cacheContext, keys []*datastore.Key) error {
 
 	cc.Lock()
 	for _, key := range keys {
-		delete(cc.cache, key)
+		delete(cc.cache, key.Encode())
 	}
 	cc.Unlock()
 	return nil
