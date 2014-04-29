@@ -183,7 +183,7 @@ func TestMultiCache(t *testing.T) {
 	}
 	const entityCount = 88
 
-	cc := nds.NewCacheContext(c)
+	cc := nds.NewContext(c)
 
 	// Create entities.
 	keys := []*datastore.Key{}
@@ -276,7 +276,7 @@ func TestMultiCache(t *testing.T) {
 	}
 
 	// Get from memcache.
-	cc = nds.NewCacheContext(c)
+	cc = nds.NewContext(c)
 	respEntities = make([]testEntity, len(keys))
 	err = nds.GetMultiCache(cc, keys, respEntities)
 	if err == nil {
@@ -328,7 +328,7 @@ func TestRunInTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cc := nds.NewCacheContext(c)
+	cc := nds.NewContext(c)
 	err = nds.RunInTransaction(cc, func(tc appengine.Context) error {
 		entity = &testEntity{}
 		if err := nds.GetCache(tc, key, entity); err != nil {

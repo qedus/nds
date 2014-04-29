@@ -14,12 +14,18 @@ import (
 )
 
 const (
-	// multiLimit is the App Engine datastore limit for the number of entities
-	// that can be PutMulti or GetMulti in one call.
-	multiLimit = 1000
+	// getMultiLimit is the App Engine datastore limit for the maximum number 
+    // of entities that can be got by datastore.GetMulti at once.
+    // nds.GetMulti increases this limit by performing as many
+    // datastore.GetMulti as required concurrently and collating the results.
+	getMultiLimit = 1000
+
+    // putMultiLimit is the App Engine datastore limit for the maximum number
+    // of entities that can be put by the datastore.PutMulti at once.
+    putMultiLimit = 500
 
 	// memcachePrefix is the namespace memcache uses to store entities.
-	memcachePrefix = "NDS:"
+	memcachePrefix = "NDS0:"
 
 	// memcacheLockTime is the maximum length of time a memcache lock will be
 	// held for. 32 seconds is choosen as 30 seconds is the maximum amount of
@@ -34,7 +40,7 @@ const (
 var (
 	// milMultiError is a convenience slice used to represent a nil error when
 	// grouping errors in GetMulti.
-	nilMultiError = make(appengine.MultiError, multiLimit)
+	nilMultiError = make(appengine.MultiError, getMultiLimit)
 )
 
 func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
@@ -68,13 +74,13 @@ func GetMulti(c appengine.Context,
 		return nil
 	}
 
-	p := len(keys) / multiLimit
+	p := len(keys) / getMultiLimit
 	errs := make([]error, p+1)
 	wg := sync.WaitGroup{}
 	for i := 0; i < p; i++ {
 		index := i
-		keySlice := keys[i*multiLimit : (i+1)*multiLimit]
-		dstSlice := v.Slice(i*multiLimit, (i+1)*multiLimit)
+		keySlice := keys[i*getMultiLimit : (i+1)*getMultiLimit]
+		dstSlice := v.Slice(i*getMultiLimit, (i+1)*getMultiLimit)
 
 		wg.Add(1)
 		go func() {
@@ -83,11 +89,11 @@ func GetMulti(c appengine.Context,
 		}()
 	}
 
-	if len(keys)%multiLimit == 0 {
+	if len(keys)%getMultiLimit == 0 {
 		errs = errs[:len(errs)-1]
 	} else {
-		keySlice := keys[p*multiLimit : len(keys)]
-		dstSlice := v.Slice(p*multiLimit, len(keys))
+		keySlice := keys[p*getMultiLimit : len(keys)]
+		dstSlice := v.Slice(p*getMultiLimit, len(keys))
 		wg.Add(1)
 		go func() {
 			errs[p] = datastore.GetMulti(c, keySlice, dstSlice.Interface())
@@ -140,7 +146,7 @@ type cacheContext struct {
 
 // NewCacheContext returns an appengine.Context that allows this package
 // use memory cache and memcache when accessing the datastore.
-func NewCacheContext(c appengine.Context) appengine.Context {
+func NewContext(c appengine.Context) appengine.Context {
 	return &cacheContext{
 		Context: c,
 		RWMutex: &sync.RWMutex{},
