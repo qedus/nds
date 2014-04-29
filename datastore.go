@@ -116,7 +116,7 @@ func GetMulti(c appengine.Context,
 	return groupedErrs
 }
 
-type cacheContext struct {
+type context struct {
 	appengine.Context
 
 	// RWMutex is used to protect cache during concurrent access. It needs to
@@ -139,7 +139,7 @@ type cacheContext struct {
 // NewCacheContext returns an appengine.Context that allows this package
 // use memory cache and memcache when accessing the datastore.
 func NewContext(c appengine.Context) appengine.Context {
-	return &cacheContext{
+	return &context{
 		Context: c,
 		RWMutex: &sync.RWMutex{},
 		cache:   map[string]datastore.PropertyList{},
@@ -156,7 +156,7 @@ func GetMultiCache(c appengine.Context,
 		return err
 	}
 
-	if cc, ok := c.(*cacheContext); ok {
+	if cc, ok := c.(*context); ok {
 		return getMultiCache(cc, keys, v)
 	} else {
 		return datastore.GetMulti(c, keys, dst)
@@ -262,7 +262,7 @@ func newGetState(keys []*datastore.Key, vals reflect.Value) *getState {
 //    seconds.
 //
 // dst argument must be a slice.
-func getMultiCache(cc *cacheContext,
+func getMultiCache(cc *context,
 	keys []*datastore.Key, dst reflect.Value) error {
 
 	gs := newGetState(keys, dst)
@@ -303,7 +303,7 @@ func getMultiCache(cc *cacheContext,
 	}
 }
 
-func loadGetMemory(cc *cacheContext, gs *getState) error {
+func loadGetMemory(cc *context, gs *getState) error {
 	cc.RLock()
 	defer cc.RUnlock()
 
@@ -324,7 +324,7 @@ func loadGetMemory(cc *cacheContext, gs *getState) error {
 	return nil
 }
 
-func loadGetMemcache(cc *cacheContext, gs *getState) error {
+func loadGetMemcache(cc *context, gs *getState) error {
 
 	memcacheKeys := make([]string, 0, len(gs.missingMemoryKeys))
 	for key := range gs.missingMemoryKeys {
@@ -447,7 +447,7 @@ func saveGetMemcache(c appengine.Context, gs *getState) error {
 	}
 }
 
-func saveGetMemory(cc *cacheContext, gs *getState) error {
+func saveGetMemory(cc *context, gs *getState) error {
 	cc.Lock()
 	defer cc.Unlock()
 	for i, err := range gs.errs {
@@ -518,7 +518,7 @@ func PutMultiCache(c appengine.Context,
 		return nil, err
 	}
 
-	if cc, ok := c.(*cacheContext); ok {
+	if cc, ok := c.(*context); ok {
 		return putMultiCache(cc, keys, v)
 	} else {
 		return datastore.PutMulti(c, keys, src)
@@ -541,7 +541,7 @@ func PutCache(c appengine.Context,
 // example, we could convert the src to property lists right at the beginning
 // of the function or we could get rid of the reliance on propertly lists
 // completely.
-func putMultiCache(cc *cacheContext,
+func putMultiCache(cc *context,
 	keys []*datastore.Key, src reflect.Value) ([]*datastore.Key, error) {
 
 	lockMemcacheKeys := []string{}
@@ -595,7 +595,7 @@ func putMultiCache(cc *cacheContext,
 }
 
 func DeleteMultiCache(c appengine.Context, keys []*datastore.Key) error {
-	if cc, ok := c.(*cacheContext); ok {
+	if cc, ok := c.(*context); ok {
 		return deleteMultiCache(cc, keys)
 	} else {
 		return datastore.DeleteMulti(c, keys)
@@ -606,7 +606,7 @@ func DeleteCache(c appengine.Context, key *datastore.Key) error {
 	return DeleteMultiCache(c, []*datastore.Key{key})
 }
 
-func deleteMultiCache(cc *cacheContext, keys []*datastore.Key) error {
+func deleteMultiCache(cc *context, keys []*datastore.Key) error {
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {
 		// TODO: Could possibly check for incomplete key here.
@@ -639,18 +639,18 @@ func deleteMultiCache(cc *cacheContext, keys []*datastore.Key) error {
 func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	opts *datastore.TransactionOptions) error {
 
-	if cc, ok := c.(*cacheContext); ok {
+	if cc, ok := c.(*context); ok {
 		return runInTransaction(cc, f, opts)
 	} else {
 		return datastore.RunInTransaction(c, f, opts)
 	}
 }
 
-func runInTransaction(cc *cacheContext, f func(tc appengine.Context) error,
+func runInTransaction(cc *context, f func(tc appengine.Context) error,
 	opts *datastore.TransactionOptions) error {
 
 	return datastore.RunInTransaction(cc, func(tc appengine.Context) error {
-		tcc := &cacheContext{
+		tcc := &context{
 			Context: tc,
 
 			RWMutex: cc.RWMutex,
