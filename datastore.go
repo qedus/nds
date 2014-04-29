@@ -48,12 +48,25 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	return nil
 }
 
-// GetMulti works just like datastore.GetMulti except it removes the API limit
-// of 1000 entities per request by calling datastore.GetMulti as many times as
-// required to complete the request.
+// GetMulti works just like datastore.GetMulti except for two important
+// advantages:
 //
-// Increase the datastore timeout if you get datastore_v3: TIMEOUT errors. You
-// can do this using
+// 1) It removes the API limit of 1000 entities per request by
+// calling the datastore as many times as required to fetch all the keys. It
+// does this efficiently and concurrently.
+//
+// 2) If you use an appengine.Context created from this packages NewContext the
+// GetMulti function will automatically invoke a caching mechanism identical
+// to the Python ndb package. It also has the same strong cache consistency
+// guarantees as the Python ndb package. It will check local memory for an
+// entity, then check memcache and then the datastore. This has the potential
+// to greatly speed up your entity access and reduce Google App Engine costs.
+// Note that if you use GetMulti with this packages NewContext, you must do all
+// your other datastore accesses with other methods from this package to ensure
+// cache consistency.
+//
+// Increase the datastore timeout if you get datastore_v3: TIMEOUT errors when
+// getting thousands of entities. You can do this using
 // http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
 func GetMulti(c appengine.Context,
 	keys []*datastore.Key, dst interface{}) error {
@@ -85,7 +98,7 @@ func GetMulti(c appengine.Context,
 		go func(index int) {
 			// Default to datastore.GetMulti if we do not get a nds.context.
 			if cc, ok := c.(*context); ok {
-				errs[index] = getMultiCache(cc, keySlice, dstSlice)
+				errs[index] = getMulti(cc, keySlice, dstSlice)
 			} else {
 				errs[index] = datastore.GetMulti(c,
 					keySlice, dstSlice.Interface())
@@ -142,8 +155,8 @@ type context struct {
 	inTransaction bool
 }
 
-// NewCacheContext returns an appengine.Context that allows this package
-// use memory cache and memcache when accessing the datastore.
+// NewContext returns an appengine.Context that allows this package to use
+// use memory cache and memcache when operation on the datastore.
 func NewContext(c appengine.Context) appengine.Context {
 	return &context{
 		Context: c,
@@ -152,7 +165,9 @@ func NewContext(c appengine.Context) appengine.Context {
 	}
 }
 
-func GetCache(c appengine.Context, key *datastore.Key, dst interface{}) error {
+// Get is a wrapper around GetMulti. Its return values are identical to
+// datastore.Get.
+func Get(c appengine.Context, key *datastore.Key, dst interface{}) error {
 	err := GetMulti(c, []*datastore.Key{key}, []interface{}{dst})
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
@@ -163,9 +178,8 @@ func GetCache(c appengine.Context, key *datastore.Key, dst interface{}) error {
 func addrValue(v reflect.Value) reflect.Value {
 	if v.Kind() == reflect.Struct {
 		return v.Addr()
-	} else {
-		return v
 	}
+	return v
 }
 
 func setValue(index int, vals reflect.Value, pl *datastore.PropertyList) error {
@@ -173,7 +187,7 @@ func setValue(index int, vals reflect.Value, pl *datastore.PropertyList) error {
 	return LoadStruct(elem.Interface(), pl)
 }
 
-type getState struct {
+type getMultiState struct {
 	keys      []*datastore.Key
 	vals      reflect.Value
 	errs      appengine.MultiError
@@ -194,8 +208,8 @@ type getState struct {
 	missingDatastoreKeys map[*datastore.Key]bool
 }
 
-func newGetState(keys []*datastore.Key, vals reflect.Value) *getState {
-	gs := &getState{
+func newGetState(keys []*datastore.Key, vals reflect.Value) *getMultiState {
+	gs := &getMultiState{
 		keys: keys,
 		vals: vals,
 		errs: make(appengine.MultiError, vals.Len()),
@@ -216,7 +230,7 @@ func newGetState(keys []*datastore.Key, vals reflect.Value) *getState {
 	return gs
 }
 
-// getMultiCache attempts to get entities from local cache, memcache, then the
+// getMulti attempts to get entities from local cache, memcache, then the
 // datastore. It also tries to replenish each cache in turn if an entity is
 // available.
 // The not so obvious part is replenishing memcache with the datastore to
@@ -250,49 +264,50 @@ func newGetState(keys []*datastore.Key, vals reflect.Value) *getState {
 //    memcache and now the memcache for that key is out of action for 32
 //    seconds.
 //
+// Note that within a transaction, much of this functionality is lost to ensure
+// datastore consistency.
+//
 // dst argument must be a slice.
-func getMultiCache(cc *context,
-	keys []*datastore.Key, dst reflect.Value) error {
+func getMulti(cc *context, keys []*datastore.Key, dst reflect.Value) error {
 
 	gs := newGetState(keys, dst)
 
-	if err := loadGetMemory(cc, gs); err != nil {
+	if err := loadMemory(cc, gs); err != nil {
 		return err
 	}
 
 	if !cc.inTransaction {
-		if err := loadGetMemcache(cc, gs); err != nil {
+		if err := loadMemcache(cc, gs); err != nil {
 			return err
 		}
 
 		// Lock memcache while we get new data from the datastore.
-		if err := lockGetMemcache(cc, gs); err != nil {
+		if err := lockMemcache(cc, gs); err != nil {
 			return err
 		}
 	}
 
-	if err := loadGetDatastore(cc, gs); err != nil {
+	if err := loadDatastore(cc, gs); err != nil {
 		return err
 	}
 
 	if !cc.inTransaction {
-		if err := saveGetMemcache(cc, gs); err != nil {
+		if err := saveMemcache(cc, gs); err != nil {
 			return err
 		}
 	}
 
-	if err := saveGetMemory(cc, gs); err != nil {
+	if err := saveMemory(cc, gs); err != nil {
 		return err
 	}
 
 	if gs.errsCount == 0 {
 		return nil
-	} else {
-		return gs.errs
 	}
+	return gs.errs
 }
 
-func loadGetMemory(cc *context, gs *getState) error {
+func loadMemory(cc *context, gs *getMultiState) error {
 	cc.RLock()
 	defer cc.RUnlock()
 
@@ -313,44 +328,44 @@ func loadGetMemory(cc *context, gs *getState) error {
 	return nil
 }
 
-func loadGetMemcache(cc *context, gs *getState) error {
+func loadMemcache(cc *context, gs *getMultiState) error {
 
 	memcacheKeys := make([]string, 0, len(gs.missingMemoryKeys))
 	for key := range gs.missingMemoryKeys {
 		memcacheKeys = append(memcacheKeys, createMemcacheKey(key))
 	}
 
-	if items, err := memcache.GetMulti(cc, memcacheKeys); err != nil {
+	items, err := memcache.GetMulti(cc, memcacheKeys)
+	if err != nil {
 		return err
-	} else {
-		for key := range gs.missingMemoryKeys {
-			memcacheKey := createMemcacheKey(key)
+	}
+	for key := range gs.missingMemoryKeys {
+		memcacheKey := createMemcacheKey(key)
 
-			if item, ok := items[memcacheKey]; ok {
-				if isItemLocked(item) {
-					gs.lockedMemcacheKeys[key] = true
-				} else {
-					if pl, err := decodePropertyList(item.Value); err != nil {
-						return err
-					} else {
-						index := gs.keyIndex[key]
-						if err := setValue(index, gs.vals, &pl); err != nil {
-							return err
-						}
-
-						gs.errs[index] = nil
-						gs.errsCount--
-					}
-				}
+		if item, ok := items[memcacheKey]; ok {
+			if isItemLocked(item) {
+				gs.lockedMemcacheKeys[key] = true
 			} else {
-				gs.missingMemcacheKeys[key] = true
+				pl, err := decodePropertyList(item.Value)
+				if err != nil {
+					return err
+				}
+				index := gs.keyIndex[key]
+				if err := setValue(index, gs.vals, &pl); err != nil {
+					return err
+				}
+
+				gs.errs[index] = nil
+				gs.errsCount--
 			}
+		} else {
+			gs.missingMemcacheKeys[key] = true
 		}
 	}
 	return nil
 }
 
-func loadGetDatastore(c appengine.Context, gs *getState) error {
+func loadDatastore(c appengine.Context, gs *getMultiState) error {
 
 	keys := make([]*datastore.Key, 0,
 		len(gs.missingMemoryKeys)+len(gs.lockedMemcacheKeys))
@@ -396,7 +411,7 @@ func loadGetDatastore(c appengine.Context, gs *getState) error {
 	return nil
 }
 
-func saveGetMemcache(c appengine.Context, gs *getState) error {
+func saveMemcache(c appengine.Context, gs *getMultiState) error {
 
 	items := []*memcache.Item{}
 	for key := range gs.missingMemcacheKeys {
@@ -436,7 +451,7 @@ func saveGetMemcache(c appengine.Context, gs *getState) error {
 	}
 }
 
-func saveGetMemory(cc *context, gs *getState) error {
+func saveMemory(cc *context, gs *getMultiState) error {
 	cc.Lock()
 	defer cc.Unlock()
 	for i, err := range gs.errs {
@@ -456,7 +471,7 @@ func isItemLocked(item *memcache.Item) bool {
 	return item.Flags == memcacheLock
 }
 
-func lockGetMemcache(c appengine.Context, gs *getState) error {
+func lockMemcache(c appengine.Context, gs *getMultiState) error {
 
 	lockItems := make([]*memcache.Item, 0, len(gs.missingMemcacheKeys))
 	memcacheKeys := make([]string, 0, len(gs.missingMemcacheKeys))
@@ -476,11 +491,12 @@ func lockGetMemcache(c appengine.Context, gs *getState) error {
 		return err
 	}
 
-	if items, err := memcache.GetMulti(c, memcacheKeys); err != nil {
+	items, err := memcache.GetMulti(c, memcacheKeys)
+	if err != nil {
 		return err
-	} else {
-		gs.lockedMemcacheItems = items
 	}
+	gs.lockedMemcacheItems = items
+
 	return nil
 }
 
@@ -499,7 +515,9 @@ func createMemcacheKey(key *datastore.Key) string {
 	return memcachePrefix + key.Encode()
 }
 
-func PutMultiCache(c appengine.Context,
+// PutMulti works just like datastore.PutMulti except when a context generated
+// from NewContext is used it caches entities in local memory and memcache.
+func PutMulti(c appengine.Context,
 	keys []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
 
 	v := reflect.ValueOf(src)
@@ -508,29 +526,30 @@ func PutMultiCache(c appengine.Context,
 	}
 
 	if cc, ok := c.(*context); ok {
-		return putMultiCache(cc, keys, v)
-	} else {
-		return datastore.PutMulti(c, keys, src)
+		return putMulti(cc, keys, v)
 	}
+	return datastore.PutMulti(c, keys, src)
 }
 
-func PutCache(c appengine.Context,
+// Put is a wrapper around PutMulti. It has the same characteristics as
+// datastore.Put.
+func Put(c appengine.Context,
 	key *datastore.Key, src interface{}) (*datastore.Key, error) {
-	k, err := PutMultiCache(c, []*datastore.Key{key}, []interface{}{src})
+	k, err := PutMulti(c, []*datastore.Key{key}, []interface{}{src})
 	if err != nil {
 		return nil, err
 	}
 	return k[0], nil
 }
 
-// putMultiCache puts the entities into the datastore and then its local cache.
+// putMulti puts the entities into the datastore and then its local cache.
 //
 // Warning that errors still need to be sorted out here so that if an error is
 // returned we must be sure that the data did not commit to the datastore. For
 // example, we could convert the src to property lists right at the beginning
 // of the function or we could get rid of the reliance on propertly lists
 // completely.
-func putMultiCache(cc *context,
+func putMulti(cc *context,
 	keys []*datastore.Key, src reflect.Value) ([]*datastore.Key, error) {
 
 	lockMemcacheKeys := []string{}
@@ -583,19 +602,21 @@ func putMultiCache(cc *context,
 	return keys, nil
 }
 
-func DeleteMultiCache(c appengine.Context, keys []*datastore.Key) error {
+// DeleteMulti works just like datastore.DeleteMulti except also cleans up
+// local and memcache if a context from NewContext is used.
+func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	if cc, ok := c.(*context); ok {
-		return deleteMultiCache(cc, keys)
-	} else {
-		return datastore.DeleteMulti(c, keys)
+		return deleteMulti(cc, keys)
 	}
+	return datastore.DeleteMulti(c, keys)
 }
 
-func DeleteCache(c appengine.Context, key *datastore.Key) error {
-	return DeleteMultiCache(c, []*datastore.Key{key})
+// Delete is a wrapper around DeleteMulti.
+func Delete(c appengine.Context, key *datastore.Key) error {
+	return DeleteMulti(c, []*datastore.Key{key})
 }
 
-func deleteMultiCache(cc *context, keys []*datastore.Key) error {
+func deleteMulti(cc *context, keys []*datastore.Key) error {
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {
 		// TODO: Could possibly check for incomplete key here.
@@ -625,14 +646,16 @@ func deleteMultiCache(cc *context, keys []*datastore.Key) error {
 	return nil
 }
 
+// RunInTransaction works just like datastore.RunInTransaction however it
+// interacts correcly with memory and memcache if a context generated by
+// NewContext is used.
 func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	opts *datastore.TransactionOptions) error {
 
 	if cc, ok := c.(*context); ok {
 		return runInTransaction(cc, f, opts)
-	} else {
-		return datastore.RunInTransaction(c, f, opts)
 	}
+	return datastore.RunInTransaction(c, f, opts)
 }
 
 func runInTransaction(cc *context, f func(tc appengine.Context) error,

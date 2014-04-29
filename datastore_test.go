@@ -75,7 +75,7 @@ func TestGetMultiNoErrors(t *testing.T) {
 		}
 
 		respEntities := []testEntity{}
-		for _, _ = range keys {
+		for _ = range keys {
 			respEntities = append(respEntities, testEntity{})
 		}
 
@@ -143,7 +143,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 						me, i, count)
 				}
 			} else {
-				t.Fatal("incorrect error, index %d", i)
+				t.Fatalf("incorrect error, index %d", i)
 			}
 		}
 	}
@@ -203,7 +203,7 @@ func TestMultiCache(t *testing.T) {
 			putEntities = append(putEntities, entities[i])
 		}
 	}
-	if keys, err := nds.PutMultiCache(cc, putKeys, putEntities); err != nil {
+	if keys, err := nds.PutMulti(cc, putKeys, putEntities); err != nil {
 		t.Fatal(err)
 	} else if len(keys) != len(putKeys) {
 		t.Fatal("incorrect key len")
@@ -331,20 +331,20 @@ func TestRunInTransaction(t *testing.T) {
 	cc := nds.NewContext(c)
 	err = nds.RunInTransaction(cc, func(tc appengine.Context) error {
 		entity = &testEntity{}
-		if err := nds.GetCache(tc, key, entity); err != nil {
+		if err := nds.Get(tc, key, entity); err != nil {
 			t.Fatal(err)
 		}
 		if entity.Val != 42 {
 			t.Fatalf("entity.Val != 42: %d", entity.Val)
 		}
 		entity.Val = 43
-		if putKey, err := nds.PutCache(tc, key, entity); err != nil {
+		if putKey, err := nds.Put(tc, key, entity); err != nil {
 			t.Fatal(err)
 		} else if !putKey.Equal(key) {
 			t.Fatal("keys not equal")
 		}
 		entity = &testEntity{}
-		if err := nds.GetCache(tc, key, entity); err != nil {
+		if err := nds.Get(tc, key, entity); err != nil {
 			t.Fatal(err)
 		}
 		if entity.Val != 43 {
