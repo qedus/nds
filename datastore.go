@@ -122,15 +122,28 @@ func GetMulti(c appengine.Context,
 
 type cacheContext struct {
 	appengine.Context
+
+	// RWMutex is used to protect cache during concurrent access. It needs to
+	// be a pointer so it can be copied between transactional and
+	// non-transactional contexts when we copy the cache map.
+	*sync.RWMutex
+
+	// cache is the memory cache for entities. This could probably be changed
+	// to map[*datastore.Key]interface{} in future versions.
 	cache map[*datastore.Key]datastore.PropertyList
-	sync.RWMutex
+
+	// inTransaction is used to notify our GetMulti, PutMulti and DeleteMulti
+	// functions that we are in a transaction as their memory and memcache
+	// sync mechanisims change subtly.
+	inTransaction bool
 }
 
-// NewCacheContext returns an appengine.Context that allows GetMultiCache to
-// use local memory cache and memcache.
+// NewCacheContext returns an appengine.Context that allows this package
+// use memory cache and memcache when accessing the datastore.
 func NewCacheContext(c appengine.Context) appengine.Context {
 	return &cacheContext{
 		Context: c,
+		RWMutex: &sync.RWMutex{},
 		cache:   map[*datastore.Key]datastore.PropertyList{},
 	}
 }
@@ -152,8 +165,16 @@ func GetMultiCache(c appengine.Context,
 	}
 }
 
+func GetCache(c appengine.Context, key *datastore.Key, dst interface{}) error {
+	err := GetMultiCache(c, []*datastore.Key{key}, []interface{}{dst})
+	if me, ok := err.(appengine.MultiError); ok {
+		return me[0]
+	}
+	return err
+}
+
 func addrValue(v reflect.Value) reflect.Value {
-	if v.Kind() != reflect.Ptr {
+	if v.Kind() == reflect.Struct {
 		return v.Addr()
 	} else {
 		return v
@@ -252,21 +273,25 @@ func getMultiCache(cc *cacheContext,
 		return err
 	}
 
-	if err := loadGetMemcache(cc, gs); err != nil {
-		return err
-	}
+	if !cc.inTransaction {
+		if err := loadGetMemcache(cc, gs); err != nil {
+			return err
+		}
 
-	// Lock memcache while we get new data from the datastore.
-	if err := lockGetMemcache(cc, gs); err != nil {
-		return err
+		// Lock memcache while we get new data from the datastore.
+		if err := lockGetMemcache(cc, gs); err != nil {
+			return err
+		}
 	}
 
 	if err := loadGetDatastore(cc, gs); err != nil {
 		return err
 	}
 
-	if err := saveGetMemcache(cc, gs); err != nil {
-		return err
+	if !cc.inTransaction {
+		if err := saveGetMemcache(cc, gs); err != nil {
+			return err
+		}
 	}
 
 	if err := saveGetMemory(cc, gs); err != nil {
@@ -343,15 +368,15 @@ func loadGetMemcache(cc *cacheContext, gs *getState) error {
 func loadGetDatastore(c appengine.Context, gs *getState) error {
 
 	keys := make([]*datastore.Key, 0,
-		len(gs.missingMemcacheKeys)+len(gs.lockedMemcacheKeys))
-	for key := range gs.missingMemcacheKeys {
+		len(gs.missingMemoryKeys)+len(gs.lockedMemcacheKeys))
+	for key := range gs.missingMemoryKeys {
 		keys = append(keys, key)
 	}
 	for key := range gs.lockedMemcacheKeys {
 		keys = append(keys, key)
 	}
 	pls := make([]datastore.PropertyList,
-		len(gs.missingMemcacheKeys)+len(gs.lockedMemcacheKeys))
+		len(gs.missingMemoryKeys)+len(gs.lockedMemcacheKeys))
 
 	if err := datastore.GetMulti(c, keys, pls); err == nil {
 		for i, key := range keys {
@@ -503,6 +528,18 @@ func PutMultiCache(c appengine.Context,
 	}
 }
 
+func PutCache(c appengine.Context,
+	key *datastore.Key, src interface{}) (*datastore.Key, error) {
+	k, err := PutMultiCache(c, []*datastore.Key{key}, []interface{}{src})
+	if err != nil {
+		if me, ok := err.(appengine.MultiError); ok {
+			return nil, me[0]
+		}
+		return nil, err
+	}
+	return k[0], nil
+}
+
 // putMultiCache puts the entities into the datastore and then its local cache.
 //
 // Warning that errors still need to be sorted out here so that if an error is
@@ -539,10 +576,12 @@ func putMultiCache(cc *cacheContext,
 		return nil, err
 	}
 
-	// Remove the locks.
-	if err := memcache.DeleteMulti(cc, lockMemcacheKeys); err != nil {
-		if _, ok := err.(appengine.MultiError); !ok {
-			return nil, err
+	if !cc.inTransaction {
+		// Remove the locks.
+		if err := memcache.DeleteMulti(cc, lockMemcacheKeys); err != nil {
+			if _, ok := err.(appengine.MultiError); !ok {
+				return nil, err
+			}
 		}
 	}
 
@@ -560,16 +599,19 @@ func putMultiCache(cc *cacheContext,
 	return keys, nil
 }
 
-func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
-
+func DeleteMultiCache(c appengine.Context, keys []*datastore.Key) error {
 	if cc, ok := c.(*cacheContext); ok {
-		return deleteMulti(cc, keys)
+		return deleteMultiCache(cc, keys)
 	} else {
 		return datastore.DeleteMulti(c, keys)
 	}
 }
 
-func deleteMulti(cc *cacheContext, keys []*datastore.Key) error {
+func DeleteCache(c appengine.Context, key *datastore.Key) error {
+	return DeleteMultiCache(c, []*datastore.Key{key})
+}
+
+func deleteMultiCache(cc *cacheContext, keys []*datastore.Key) error {
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {
 		// TODO: Could possibly check for incomplete key here.
@@ -597,6 +639,32 @@ func deleteMulti(cc *cacheContext, keys []*datastore.Key) error {
 	}
 	cc.Unlock()
 	return nil
+}
+
+func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
+	opts *datastore.TransactionOptions) error {
+
+	if cc, ok := c.(*cacheContext); ok {
+		return runInTransaction(cc, f, opts)
+	} else {
+		return datastore.RunInTransaction(c, f, opts)
+	}
+}
+
+func runInTransaction(cc *cacheContext, f func(tc appengine.Context) error,
+	opts *datastore.TransactionOptions) error {
+
+	return datastore.RunInTransaction(cc, func(tc appengine.Context) error {
+		tcc := &cacheContext{
+			Context: tc,
+
+			RWMutex: cc.RWMutex,
+			cache:   cc.cache,
+
+			inTransaction: true,
+		}
+		return f(tcc)
+	}, opts)
 }
 
 // SaveStruct saves src to a datastore.PropertyList.
