@@ -58,10 +58,11 @@ func GetMulti(c appengine.Context,
 			hi = len(keys)
 		}
 
+        index := i
 		keySlice := keys[lo:hi]
 		dstSlice := v.Slice(lo, hi)
 
-		go func(index int) {
+		go func() {
 			// Default to datastore.GetMulti if we do not get a nds.context.
 			if cc, ok := c.(*context); ok {
 				errs[index] = getMulti(cc, keySlice, dstSlice)
@@ -70,7 +71,7 @@ func GetMulti(c appengine.Context,
 					keySlice, dstSlice.Interface())
 			}
 			wg.Done()
-		}(i)
+		}()
 	}
 	wg.Wait()
 
