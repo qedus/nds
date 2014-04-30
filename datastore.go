@@ -48,6 +48,16 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	return nil
 }
 
+// NewContext returns an appengine.Context that allows this package to use
+// use memory cache and memcache when operation on the datastore.
+func NewContext(c appengine.Context) appengine.Context {
+	return &context{
+		Context: c,
+		RWMutex: &sync.RWMutex{},
+		cache:   map[string]datastore.PropertyList{},
+	}
+}
+
 // GetMulti works just like datastore.GetMulti except for two important
 // advantages:
 //
@@ -153,16 +163,6 @@ type context struct {
 	// functions that we are in a transaction as their memory and memcache
 	// sync mechanisims change subtly.
 	inTransaction bool
-}
-
-// NewContext returns an appengine.Context that allows this package to use
-// use memory cache and memcache when operation on the datastore.
-func NewContext(c appengine.Context) appengine.Context {
-	return &context{
-		Context: c,
-		RWMutex: &sync.RWMutex{},
-		cache:   map[string]datastore.PropertyList{},
-	}
 }
 
 // Get is a wrapper around GetMulti. Its return values are identical to
