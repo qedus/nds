@@ -13,9 +13,10 @@ import (
 func Timeout(c appengine.Context, d time.Duration) appengine.Context {
 	if ndsc, ok := c.(*context); ok {
 		return &context{
-			Context: appengine.Timeout(ndsc.Context, d),
-			RWMutex: ndsc.RWMutex,
-			cache:   ndsc.cache,
+			Context:       appengine.Timeout(ndsc.Context, d),
+			RWMutex:       ndsc.RWMutex,
+			cache:         ndsc.cache,
+			inTransaction: ndsc.inTransaction,
 		}
 	}
 	return appengine.Timeout(c, d)
