@@ -208,7 +208,8 @@ type getMultiState struct {
 	missingDatastoreKeys map[*datastore.Key]bool
 }
 
-func newGetState(keys []*datastore.Key, vals reflect.Value) *getMultiState {
+func newGetMultiState(keys []*datastore.Key,
+	vals reflect.Value) *getMultiState {
 	gs := &getMultiState{
 		keys: keys,
 		vals: vals,
@@ -270,7 +271,7 @@ func newGetState(keys []*datastore.Key, vals reflect.Value) *getMultiState {
 // dst argument must be a slice.
 func getMulti(cc *context, keys []*datastore.Key, dst reflect.Value) error {
 
-	gs := newGetState(keys, dst)
+	gs := newGetMultiState(keys, dst)
 
 	if err := loadMemory(cc, gs); err != nil {
 		return err
