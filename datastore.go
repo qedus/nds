@@ -121,7 +121,7 @@ func GetMulti(c appengine.Context,
 
 	groupedErrs := make(appengine.MultiError, len(keys))
 	for i, err := range errs {
-		lo := i * len(errs)
+		lo := i * getMultiLimit
 		hi := (i + 1) * getMultiLimit
 		if hi > len(keys) {
 			hi = len(keys)
@@ -191,7 +191,7 @@ type getMultiState struct {
 	keys      []*datastore.Key
 	vals      reflect.Value
 	errs      appengine.MultiError
-	errsCount int
+	errsExist bool
 
 	keyIndex map[*datastore.Key]int
 
@@ -301,10 +301,10 @@ func getMulti(cc *context, keys []*datastore.Key, dst reflect.Value) error {
 		return err
 	}
 
-	if gs.errsCount == 0 {
-		return nil
+	if gs.errsExist {
+		return gs.errs
 	}
-	return gs.errs
+	return nil
 }
 
 func loadMemory(cc *context, gs *getMultiState) error {
@@ -315,7 +315,7 @@ func loadMemory(cc *context, gs *getMultiState) error {
 		if pl, ok := cc.cache[key.Encode()]; ok {
 			if len(pl) == 0 {
 				gs.errs[index] = datastore.ErrNoSuchEntity
-				gs.errsCount++
+				gs.errsExist = true
 			} else {
 				if err := setValue(index, gs.vals, &pl); err != nil {
 					return err
@@ -354,9 +354,6 @@ func loadMemcache(cc *context, gs *getMultiState) error {
 				if err := setValue(index, gs.vals, &pl); err != nil {
 					return err
 				}
-
-				gs.errs[index] = nil
-				gs.errsCount--
 			}
 		} else {
 			gs.missingMemcacheKeys[key] = true
@@ -384,8 +381,6 @@ func loadDatastore(c appengine.Context, gs *getMultiState) error {
 			if err := setValue(index, gs.vals, &pls[i]); err != nil {
 				return err
 			}
-			gs.errs[index] = nil
-			gs.errsCount--
 		}
 	} else if me, ok := err.(appengine.MultiError); ok {
 		for i, err := range me {
@@ -394,12 +389,10 @@ func loadDatastore(c appengine.Context, gs *getMultiState) error {
 				if err := setValue(index, gs.vals, &pls[i]); err != nil {
 					return err
 				}
-				gs.errs[index] = nil
-				gs.errsCount--
 			} else if err == datastore.ErrNoSuchEntity {
 				index := gs.keyIndex[keys[i]]
 				gs.errs[index] = datastore.ErrNoSuchEntity
-				gs.errsCount++
+				gs.errsExist = true
 				gs.missingDatastoreKeys[keys[i]] = true
 			} else {
 				return err

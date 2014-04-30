@@ -79,7 +79,8 @@ func TestGetMultiNoErrors(t *testing.T) {
 			respEntities = append(respEntities, testEntity{})
 		}
 
-		if err := nds.GetMulti(c, keys, respEntities); err != nil {
+		cc := nds.NewContext(c)
+		if err := nds.GetMulti(cc, keys, respEntities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -124,10 +125,17 @@ func TestGetMultiErrorMix(t *testing.T) {
 			}
 		}
 
+		cc := nds.NewContext(c)
 		respEntities := make([]testEntity, len(keys))
-		err := nds.GetMulti(c, keys, respEntities)
+		err := nds.GetMulti(cc, keys, respEntities)
 		if err == nil {
 			t.Fatal("should be errors")
+		}
+
+		if me, ok := err.(appengine.MultiError); !ok {
+			t.Fatal("not appengine.MultiError")
+		} else if len(me) != len(keys) {
+			t.Fatal("incorrect length appengine.MultiError")
 		}
 
 		// Check respEntities are in order.
