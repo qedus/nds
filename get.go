@@ -269,7 +269,7 @@ func loadMemcache(cc *context, gs *getMultiState) error {
 		memcacheKey := createMemcacheKey(key)
 
 		if item, ok := items[memcacheKey]; ok {
-			if isItemLocked(item) {
+			if item.Flags == memcacheLock {
 				gs.lockedMemcacheKeys[key] = true
 			} else {
 				pl, err := decodePropertyList(item.Value)
@@ -288,6 +288,34 @@ func loadMemcache(cc *context, gs *getMultiState) error {
 	return nil
 }
 
+func lockMemcache(c appengine.Context, gs *getMultiState) error {
+
+	lockItems := make([]*memcache.Item, 0, len(gs.missingMemcacheKeys))
+	memcacheKeys := make([]string, 0, len(gs.missingMemcacheKeys))
+	for key := range gs.missingMemcacheKeys {
+		memcacheKey := createMemcacheKey(key)
+		memcacheKeys = append(memcacheKeys, memcacheKey)
+
+		item := &memcache.Item{
+			Key:        memcacheKey,
+			Flags:      memcacheLock,
+			Value:      []byte{},
+			Expiration: memcacheLockTime,
+		}
+		lockItems = append(lockItems, item)
+	}
+	if err := memcache.SetMulti(c, lockItems); err != nil {
+		return err
+	}
+
+	items, err := memcache.GetMulti(c, memcacheKeys)
+	if err != nil {
+		return err
+	}
+	gs.lockedMemcacheItems = items
+
+	return nil
+}
 func loadDatastore(c appengine.Context, gs *getMultiState) error {
 
 	keys := make([]*datastore.Key, 0,
@@ -383,38 +411,5 @@ func saveMemory(cc *context, gs *getMultiState) error {
 			cc.cache[gs.keys[i].Encode()] = pl
 		}
 	}
-	return nil
-}
-
-func isItemLocked(item *memcache.Item) bool {
-	return item.Flags == memcacheLock
-}
-
-func lockMemcache(c appengine.Context, gs *getMultiState) error {
-
-	lockItems := make([]*memcache.Item, 0, len(gs.missingMemcacheKeys))
-	memcacheKeys := make([]string, 0, len(gs.missingMemcacheKeys))
-	for key := range gs.missingMemcacheKeys {
-		memcacheKey := createMemcacheKey(key)
-		memcacheKeys = append(memcacheKeys, memcacheKey)
-
-		item := &memcache.Item{
-			Key:        memcacheKey,
-			Flags:      memcacheLock,
-			Value:      []byte{},
-			Expiration: memcacheLockTime,
-		}
-		lockItems = append(lockItems, item)
-	}
-	if err := memcache.SetMulti(c, lockItems); err != nil {
-		return err
-	}
-
-	items, err := memcache.GetMulti(c, memcacheKeys)
-	if err != nil {
-		return err
-	}
-	gs.lockedMemcacheItems = items
-
 	return nil
 }
