@@ -58,7 +58,7 @@ func GetMulti(c appengine.Context,
 			hi = len(keys)
 		}
 
-        index := i
+		index := i
 		keySlice := keys[lo:hi]
 		dstSlice := v.Slice(lo, hi)
 
