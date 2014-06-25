@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"reflect"
 	"time"
 )
@@ -66,7 +65,6 @@ func checkArgs(keys []*datastore.Key, v reflect.Value) error {
 		}
 	}
 
-	fmt.Println("Post:", elemType)
 	return errors.New("nds: vals must be a slice of pointers")
 }
 
