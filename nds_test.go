@@ -16,8 +16,6 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 	}
 	defer c.Close()
 
-	ndsc := nds.NewContext(c)
-
 	type testEntity struct {
 		Val int
 	}
@@ -33,7 +31,7 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 			entities = append(entities, &testEntity{})
 		}
 
-		err := nds.GetMulti(ndsc, keys, entities)
+		err := nds.GetMulti(c, keys, entities)
 		if me, ok := err.(appengine.MultiError); ok {
 			if len(me) != count {
 				t.Fatal("multi error length incorrect")
@@ -54,8 +52,6 @@ func TestGetMultiNoErrors(t *testing.T) {
 	}
 	defer c.Close()
 
-	ndsc := nds.NewContext(c)
-
 	type testEntity struct {
 		Val int
 	}
@@ -72,7 +68,7 @@ func TestGetMultiNoErrors(t *testing.T) {
 		}
 
 		// Save entities.
-		if _, err := nds.PutMulti(ndsc, keys, entities); err != nil {
+		if _, err := nds.PutMulti(c, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -81,7 +77,7 @@ func TestGetMultiNoErrors(t *testing.T) {
 			respEntities = append(respEntities, testEntity{})
 		}
 
-		if err := nds.GetMulti(ndsc, keys, respEntities); err != nil {
+		if err := nds.GetMulti(c, keys, respEntities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -101,8 +97,6 @@ func TestGetMultiErrorMix(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-
-	ndsc := nds.NewContext(c)
 
 	type testEntity struct {
 		Val int
@@ -129,12 +123,12 @@ func TestGetMultiErrorMix(t *testing.T) {
 			}
 		}
 
-		if _, err := nds.PutMulti(ndsc, putKeys, putEntities); err != nil {
+		if _, err := nds.PutMulti(c, putKeys, putEntities); err != nil {
 			t.Fatal(err)
 		}
 
 		respEntities := make([]testEntity, len(keys))
-		err := nds.GetMulti(ndsc, keys, respEntities)
+		err := nds.GetMulti(c, keys, respEntities)
 		if err == nil {
 			t.Fatal("should be errors")
 		}
@@ -176,13 +170,11 @@ func TestMultiCache(t *testing.T) {
 	}
 	const entityCount = 88
 
-	cc := nds.NewContext(c)
-
 	// Create entities.
 	keys := []*datastore.Key{}
 	entities := []*testEntity{}
 	for i := 0; i < entityCount; i++ {
-		key := datastore.NewKey(cc, "Test", strconv.Itoa(i), 0, nil)
+		key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 		keys = append(keys, key)
 		entities = append(entities, &testEntity{i})
 	}
@@ -196,7 +188,7 @@ func TestMultiCache(t *testing.T) {
 			putEntities = append(putEntities, entities[i])
 		}
 	}
-	if keys, err := nds.PutMulti(cc, putKeys, putEntities); err != nil {
+	if keys, err := nds.PutMulti(c, putKeys, putEntities); err != nil {
 		t.Fatal(err)
 	} else if len(keys) != len(putKeys) {
 		t.Fatal("incorrect key len")
@@ -204,7 +196,7 @@ func TestMultiCache(t *testing.T) {
 
 	// Get from datastore.
 	respEntities := make([]testEntity, len(keys))
-	err = nds.GetMulti(cc, keys, respEntities)
+	err = nds.GetMulti(c, keys, respEntities)
 	if err == nil {
 		t.Fatal("should be errors")
 	}
@@ -237,7 +229,7 @@ func TestMultiCache(t *testing.T) {
 
 	// Get from local cache.
 	respEntities = make([]testEntity, len(keys))
-	err = nds.GetMulti(cc, keys, respEntities)
+	err = nds.GetMulti(c, keys, respEntities)
 	if err == nil {
 		t.Fatal("should be errors")
 	}
@@ -269,9 +261,8 @@ func TestMultiCache(t *testing.T) {
 	}
 
 	// Get from memcache.
-	cc = nds.NewContext(c)
 	respEntities = make([]testEntity, len(keys))
-	err = nds.GetMulti(cc, keys, respEntities)
+	err = nds.GetMulti(c, keys, respEntities)
 	if err == nil {
 		t.Fatal("should be errors")
 	}
@@ -310,8 +301,6 @@ func TestRunInTransaction(t *testing.T) {
 	}
 	defer c.Close()
 
-	ndsc := nds.NewContext(c)
-
 	type testEntity struct {
 		Val int
 	}
@@ -319,11 +308,11 @@ func TestRunInTransaction(t *testing.T) {
 	entity := &testEntity{42}
 	key := datastore.NewKey(c, "Entity", "", 3, nil)
 
-	if _, err := nds.Put(ndsc, key, entity); err != nil {
+	if _, err := nds.Put(c, key, entity); err != nil {
 		t.Fatal(err)
 	}
 
-	err = nds.RunInTransaction(ndsc, func(tc appengine.Context) error {
+	err = nds.RunInTransaction(c, func(tc appengine.Context) error {
 		entity = &testEntity{}
 		if err := nds.Get(tc, key, entity); err != nil {
 			t.Fatal(err)
@@ -345,7 +334,7 @@ func TestRunInTransaction(t *testing.T) {
 	}
 
 	entity = &testEntity{}
-	if err := nds.Get(ndsc, key, entity); err != nil {
+	if err := nds.Get(c, key, entity); err != nil {
 		t.Fatal(err)
 	}
 	if entity.Val != 43 {

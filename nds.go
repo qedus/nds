@@ -70,21 +70,13 @@ func checkArgs(keys []*datastore.Key, v reflect.Value) error {
 	return errors.New("nds: vals must be a slice of pointers")
 }
 
-// NewContext returns an appengine.Context that allows this package to use
-// use memory cache and memcache when operation on the datastore.
-func NewContext(c appengine.Context) appengine.Context {
-	return &context{
-		Context: c,
-	}
+type txContext struct {
+	appengine.Context
 }
 
-type context struct {
-	appengine.Context
-
-	// inTransaction is used to notify our GetMulti, PutMulti and DeleteMulti
-	// functions that we are in a transaction as their memory and memcache
-	// sync mechanisims change subtly.
-	inTransaction bool
+func inTransaction(c appengine.Context) bool {
+	_, ok := c.(txContext)
+	return ok
 }
 
 func addrValue(v reflect.Value) reflect.Value {

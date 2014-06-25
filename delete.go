@@ -10,10 +10,7 @@ import (
 // DeleteMulti works just like datastore.DeleteMulti except also cleans up
 // local and memcache if a context from NewContext is used.
 func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
-	if cc, ok := c.(*context); ok {
-		return deleteMulti(cc, keys)
-	}
-	return datastore.DeleteMulti(c, keys)
+	return deleteMulti(c, keys)
 }
 
 // Delete is a wrapper around DeleteMulti.
@@ -21,7 +18,7 @@ func Delete(c appengine.Context, key *datastore.Key) error {
 	return DeleteMulti(c, []*datastore.Key{key})
 }
 
-func deleteMulti(cc *context, keys []*datastore.Key) error {
+func deleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {
 		if key.Incomplete() {
@@ -38,9 +35,9 @@ func deleteMulti(cc *context, keys []*datastore.Key) error {
 	}
 
 	// Make sure we can lock memcache with no errors before deleting.
-	if err := memcache.SetMulti(cc, lockMemcacheItems); err != nil {
+	if err := memcache.SetMulti(c, lockMemcacheItems); err != nil {
 		return err
 	}
 
-	return datastore.DeleteMulti(cc, keys)
+	return datastore.DeleteMulti(c, keys)
 }

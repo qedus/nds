@@ -21,10 +21,7 @@ func PutMulti(c appengine.Context,
 		return nil, err
 	}
 
-	if cc, ok := c.(*context); ok {
-		return putMulti(cc, keys, vals)
-	}
-	return datastore.PutMulti(c, keys, vals)
+	return putMulti(c, keys, vals)
 }
 
 // Put is a wrapper around PutMulti. It has the same characteristics as
@@ -39,7 +36,7 @@ func Put(c appengine.Context,
 }
 
 // putMulti puts the entities into the datastore and then its local cache.
-func putMulti(cc *context,
+func putMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
 	lockMemcacheKeys := []string{}
@@ -58,19 +55,19 @@ func putMulti(cc *context,
 			lockMemcacheItems = append(lockMemcacheItems, item)
 		}
 	}
-	if err := memcache.SetMulti(cc, lockMemcacheItems); err != nil {
+	if err := memcache.SetMulti(c, lockMemcacheItems); err != nil {
 		return nil, err
 	}
 
 	// Save to the datastore.
-	keys, err := datastore.PutMulti(cc, keys, vals)
+	keys, err := datastore.PutMulti(c, keys, vals)
 	if err != nil {
 		return nil, err
 	}
 
-	if !cc.inTransaction {
+	if !inTransaction(c) {
 		// Remove the locks.
-		if err := memcache.DeleteMulti(cc, lockMemcacheKeys); err != nil {
+		if err := memcache.DeleteMulti(c, lockMemcacheKeys); err != nil {
 			if _, ok := err.(appengine.MultiError); !ok {
 				return nil, err
 			}

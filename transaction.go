@@ -11,21 +11,10 @@ import (
 func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	opts *datastore.TransactionOptions) error {
 
-	if cc, ok := c.(*context); ok {
-		return runInTransaction(cc, f, opts)
-	}
-	return datastore.RunInTransaction(c, f, opts)
-}
-
-func runInTransaction(cc *context, f func(tc appengine.Context) error,
-	opts *datastore.TransactionOptions) error {
-
-	return datastore.RunInTransaction(cc, func(tc appengine.Context) error {
-		tcc := &context{
+	return datastore.RunInTransaction(c, func(tc appengine.Context) error {
+		txc := &txContext{
 			Context: tc,
-
-			inTransaction: true,
 		}
-		return f(tcc)
+		return f(txc)
 	}, opts)
 }
