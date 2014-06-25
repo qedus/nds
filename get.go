@@ -37,10 +37,10 @@ const getMultiLimit = 1000
 // getting thousands of entities. You can do this using
 // http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
 func GetMulti(c appengine.Context,
-	keys []*datastore.Key, dst interface{}) error {
+	keys []*datastore.Key, vals interface{}) error {
 
-	v := reflect.ValueOf(dst)
-	if err := checkMultiArgs(keys, v); err != nil {
+	v := reflect.ValueOf(vals)
+	if err := checkArgs(keys, v); err != nil {
 		return err
 	}
 

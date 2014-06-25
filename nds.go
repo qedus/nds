@@ -1,6 +1,7 @@
 package nds
 
 import (
+    "fmt"
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
@@ -31,16 +32,30 @@ func isItemLocked(item *memcache.Item) bool {
 	return bytes.Equal(item.Value, memcacheLock)
 }
 
-func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
+func checkArgs(keys []*datastore.Key, v reflect.Value) error {
 	if v.Kind() != reflect.Slice {
-		return errors.New("nds: dst is not a slice")
+		return errors.New("nds: vals is not a slice")
 	}
 
 	if len(keys) != v.Len() {
-		return errors.New("nds: key and dst slices have different length")
+		return errors.New("nds: keys and vals slices have different length")
 	}
 
-	return nil
+    elemType := v.Type().Elem()
+    switch elemType.Kind() {
+    case reflect.Struct:
+        return nil
+    case reflect.Interface:
+        return nil
+    case reflect.Ptr:
+        elemType = elemType.Elem()
+        if elemType.Kind() == reflect.Struct {
+            return nil
+        }
+    }
+
+    fmt.Println("Post:", elemType)
+    return errors.New("nds: vals must be a slice of pointers")
 }
 
 // NewContext returns an appengine.Context that allows this package to use

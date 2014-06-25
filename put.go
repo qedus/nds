@@ -15,24 +15,24 @@ const putMultiLimit = 500
 // PutMulti works just like datastore.PutMulti except when a context generated
 // from NewContext is used it caches entities in local memory and memcache.
 func PutMulti(c appengine.Context,
-	keys []*datastore.Key, src interface{}) ([]*datastore.Key, error) {
+	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
-	v := reflect.ValueOf(src)
-	if err := checkMultiArgs(keys, v); err != nil {
+	v := reflect.ValueOf(vals)
+	if err := checkArgs(keys, reflect.ValueOf(vals)); err != nil {
 		return nil, err
 	}
 
 	if cc, ok := c.(*context); ok {
 		return putMulti(cc, keys, v)
 	}
-	return datastore.PutMulti(c, keys, src)
+	return datastore.PutMulti(c, keys, vals)
 }
 
 // Put is a wrapper around PutMulti. It has the same characteristics as
 // datastore.Put.
 func Put(c appengine.Context,
-	key *datastore.Key, src interface{}) (*datastore.Key, error) {
-	k, err := PutMulti(c, []*datastore.Key{key}, []interface{}{src})
+	key *datastore.Key, val interface{}) (*datastore.Key, error) {
+	k, err := PutMulti(c, []*datastore.Key{key}, []interface{}{val})
 	if err != nil {
 		return nil, err
 	}
@@ -40,14 +40,8 @@ func Put(c appengine.Context,
 }
 
 // putMulti puts the entities into the datastore and then its local cache.
-//
-// Warning that errors still need to be sorted out here so that if an error is
-// returned we must be sure that the data did not commit to the datastore. For
-// example, we could convert the src to property lists right at the beginning
-// of the function or we could get rid of the reliance on propertly lists
-// completely.
 func putMulti(cc *context,
-	keys []*datastore.Key, src reflect.Value) ([]*datastore.Key, error) {
+	keys []*datastore.Key, vals reflect.Value) ([]*datastore.Key, error) {
 
 	lockMemcacheKeys := []string{}
 	lockMemcacheItems := []*memcache.Item{}
@@ -70,7 +64,7 @@ func putMulti(cc *context,
 	}
 
 	// Save to the datastore.
-	keys, err := datastore.PutMulti(cc, keys, src.Interface())
+	keys, err := datastore.PutMulti(cc, keys, vals.Interface())
 	if err != nil {
 		return nil, err
 	}
