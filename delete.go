@@ -24,17 +24,20 @@ func Delete(c appengine.Context, key *datastore.Key) error {
 func deleteMulti(cc *context, keys []*datastore.Key) error {
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {
-		// TODO: Could possibly check for incomplete key here.
-		memcacheKey := createMemcacheKey(key)
+		if key.Incomplete() {
+			return datastore.ErrInvalidKey
+		}
 
 		item := &memcache.Item{
-			Key:        memcacheKey,
+			Key:        createMemcacheKey(key),
 			Flags:      rand.Uint32(),
 			Value:      memcacheLock,
 			Expiration: memcacheLockTime,
 		}
 		lockMemcacheItems = append(lockMemcacheItems, item)
 	}
+
+	// Make sure we can lock memcache with no errors before deleting.
 	if err := memcache.SetMulti(cc, lockMemcacheItems); err != nil {
 		return err
 	}

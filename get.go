@@ -213,8 +213,12 @@ func getMulti(cc *context, keys []*datastore.Key, dst reflect.Value) error {
 		}
 	}
 
-	if err := loadDatastore(cc, gs); err != nil {
-		return err
+	if cc.inTransaction {
+		return datastore.GetMulti(cc, keys, dst.Interface())
+	} else {
+		if err := loadDatastore(cc, gs); err != nil {
+			return err
+		}
 	}
 
 	if !cc.inTransaction {
@@ -336,9 +340,11 @@ func loadDatastore(c appengine.Context, gs *getMultiState) error {
 	}
 	pls := make([]datastore.PropertyList, keysLength)
 
+	me := make(appengine.MultiError, len(keys))
 	err := datastore.GetMulti(c, keys, pls)
-	me, ok := err.(appengine.MultiError)
-	if !ok {
+	if e, ok := err.(appengine.MultiError); ok {
+		me = e
+	} else if err != nil {
 		return err
 	}
 
