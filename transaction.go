@@ -24,9 +24,6 @@ func runInTransaction(cc *context, f func(tc appengine.Context) error,
 		tcc := &context{
 			Context: tc,
 
-			RWMutex: cc.RWMutex,
-			cache:   cc.cache,
-
 			inTransaction: true,
 		}
 		return f(tcc)

@@ -3,11 +3,11 @@ package nds
 import (
 	"appengine"
 	"appengine/datastore"
+	"appengine/memcache"
 	"bytes"
 	"encoding/gob"
 	"errors"
 	"reflect"
-	"sync"
 	"time"
 )
 
@@ -20,10 +20,16 @@ const (
 	// time an underlying datastore call will retry even if the API reports a
 	// success to the user.
 	memcacheLockTime = 32 * time.Second
-
-	// memcacheLock is the value that is used to lock memcache.
-	memcacheLock = uint32(1)
 )
+
+var (
+	// memcacheLock is the value that is used to lock memcache.
+	memcacheLock = []byte{0}
+)
+
+func isItemLocked(item *memcache.Item) bool {
+	return bytes.Equal(item.Value, memcacheLock)
+}
 
 func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	if v.Kind() != reflect.Slice {
@@ -42,24 +48,11 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 func NewContext(c appengine.Context) appengine.Context {
 	return &context{
 		Context: c,
-		RWMutex: &sync.RWMutex{},
-		cache:   map[string]datastore.PropertyList{},
 	}
 }
 
 type context struct {
 	appengine.Context
-
-	// RWMutex is used to protect cache during concurrent access. It needs to
-	// be a pointer so it can be copied between transactional and
-	// non-transactional contexts when we copy the cache map.
-	*sync.RWMutex
-
-	// cache is the memory cache for entities. This could probably be changed
-	// to map[string]interface{} in future versions so we don't rely on
-	// datastore.PropertyList.
-	// The string key is the datastore.Key.Encode() value.
-	cache map[string]datastore.PropertyList
 
 	// inTransaction is used to notify our GetMulti, PutMulti and DeleteMulti
 	// functions that we are in a transaction as their memory and memcache

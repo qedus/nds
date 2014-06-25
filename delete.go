@@ -4,6 +4,7 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
+	"math/rand"
 )
 
 // DeleteMulti works just like datastore.DeleteMulti except also cleans up
@@ -28,8 +29,8 @@ func deleteMulti(cc *context, keys []*datastore.Key) error {
 
 		item := &memcache.Item{
 			Key:        memcacheKey,
-			Flags:      memcacheLock,
-			Value:      []byte{},
+			Flags:      rand.Uint32(),
+			Value:      memcacheLock,
 			Expiration: memcacheLockTime,
 		}
 		lockMemcacheItems = append(lockMemcacheItems, item)
@@ -42,10 +43,5 @@ func deleteMulti(cc *context, keys []*datastore.Key) error {
 		return err
 	}
 
-	cc.Lock()
-	for _, key := range keys {
-		delete(cc.cache, key.Encode())
-	}
-	cc.Unlock()
 	return nil
 }

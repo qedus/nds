@@ -4,6 +4,7 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
+	"math/rand"
 	"reflect"
 )
 
@@ -57,8 +58,8 @@ func putMulti(cc *context,
 
 			item := &memcache.Item{
 				Key:        memcacheKey,
-				Flags:      memcacheLock,
-				Value:      []byte{},
+				Flags:      rand.Uint32(),
+				Value:      memcacheLock,
 				Expiration: memcacheLockTime,
 			}
 			lockMemcacheItems = append(lockMemcacheItems, item)
@@ -82,18 +83,5 @@ func putMulti(cc *context,
 			}
 		}
 	}
-
-	// Save to local memory cache.
-	cc.Lock()
-	defer cc.Unlock()
-	for i, key := range keys {
-		pl := datastore.PropertyList{}
-		elem := addrValue(src.Index(i))
-		if err := saveStruct(elem.Interface(), &pl); err != nil {
-			return nil, err
-		}
-		cc.cache[key.Encode()] = pl
-	}
-
 	return keys, nil
 }

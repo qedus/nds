@@ -38,7 +38,7 @@ func TestTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 	if entity.Value != 52 {
-		t.Fatal("incorrect entity.Value")
+		t.Fatal("incorrect entity.Value", entity.Value)
 	}
 
 	// Check we used caching by seeing if there is the entity in cache.
