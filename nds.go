@@ -1,13 +1,13 @@
 package nds
 
 import (
-    "fmt"
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"reflect"
 	"time"
 )
@@ -26,6 +26,10 @@ const (
 var (
 	// memcacheLock is the value that is used to lock memcache.
 	memcacheLock = []byte{0}
+
+	typeOfPropertyLoadSaver = reflect.TypeOf(
+		(*datastore.PropertyLoadSaver)(nil)).Elem()
+	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
 )
 
 func isItemLocked(item *memcache.Item) bool {
@@ -41,21 +45,29 @@ func checkArgs(keys []*datastore.Key, v reflect.Value) error {
 		return errors.New("nds: keys and vals slices have different length")
 	}
 
-    elemType := v.Type().Elem()
-    switch elemType.Kind() {
-    case reflect.Struct:
-        return nil
-    case reflect.Interface:
-        return nil
-    case reflect.Ptr:
-        elemType = elemType.Elem()
-        if elemType.Kind() == reflect.Struct {
-            return nil
-        }
-    }
+	if v.Type() == typeOfPropertyList {
+		return errors.New("nds: PropertyList not supported")
+	}
 
-    fmt.Println("Post:", elemType)
-    return errors.New("nds: vals must be a slice of pointers")
+	elemType := v.Type().Elem()
+	if reflect.PtrTo(elemType).Implements(typeOfPropertyLoadSaver) {
+		return errors.New("nds: PropertyLoadSaver not supporded")
+	}
+
+	switch elemType.Kind() {
+	case reflect.Struct:
+		return nil
+	case reflect.Interface:
+		return nil
+	case reflect.Ptr:
+		elemType = elemType.Elem()
+		if elemType.Kind() == reflect.Struct {
+			return nil
+		}
+	}
+
+	fmt.Println("Post:", elemType)
+	return errors.New("nds: vals must be a slice of pointers")
 }
 
 // NewContext returns an appengine.Context that allows this package to use
