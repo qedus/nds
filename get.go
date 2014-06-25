@@ -292,7 +292,7 @@ func lockMemcache(c appengine.Context, gs *getMultiState) error {
 		} else if me[i] == memcache.ErrNotStored {
 			key := gs.memcacheKeys[item.Key]
 			gs.lockedMemcacheKeys[key] = true
-		} else if me[i] != nil {
+		} else {
 			return err
 		}
 	}

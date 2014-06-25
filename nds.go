@@ -1,7 +1,6 @@
 package nds
 
 import (
-	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
 	"bytes"
@@ -66,15 +65,6 @@ func checkArgs(keys []*datastore.Key, v reflect.Value) error {
 	}
 
 	return errors.New("nds: vals must be a slice of pointers")
-}
-
-type txContext struct {
-	appengine.Context
-}
-
-func inTransaction(c appengine.Context) bool {
-	_, ok := c.(txContext)
-	return ok
 }
 
 func addrValue(v reflect.Value) reflect.Value {
