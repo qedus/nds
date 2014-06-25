@@ -42,9 +42,5 @@ func deleteMulti(cc *context, keys []*datastore.Key) error {
 		return err
 	}
 
-	if err := datastore.DeleteMulti(cc, keys); err != nil {
-		return err
-	}
-
-	return nil
+	return datastore.DeleteMulti(cc, keys)
 }
