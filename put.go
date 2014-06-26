@@ -39,20 +39,18 @@ func Put(c appengine.Context,
 func putMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
-	lockMemcacheKeys := []string{}
-	lockMemcacheItems := []*memcache.Item{}
+	lockMemcacheKeys := make([]string, 0, len(keys))
+	lockMemcacheItems := make([]*memcache.Item, 0, len(keys))
 	for _, key := range keys {
 		if !key.Incomplete() {
-			memcacheKey := createMemcacheKey(key)
-			lockMemcacheKeys = append(lockMemcacheKeys, memcacheKey)
-
 			item := &memcache.Item{
-				Key:        memcacheKey,
+				Key:        createMemcacheKey(key),
 				Flags:      rand.Uint32(),
 				Value:      memcacheLock,
 				Expiration: memcacheLockTime,
 			}
 			lockMemcacheItems = append(lockMemcacheItems, item)
+			lockMemcacheKeys = append(lockMemcacheKeys, item.Key)
 		}
 	}
 	if err := memcache.SetMulti(c, lockMemcacheItems); err != nil {
