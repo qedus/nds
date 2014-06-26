@@ -65,11 +65,11 @@ func GetMulti(c appengine.Context,
 		dstSlice := v.Slice(lo, hi)
 
 		go func() {
-            if inTransaction(c) {
-                errs[index] = getMultiTx(c, keySlice, dstSlice.Interface())
-            } else {
-                errs[index] = getMulti(c, keySlice, dstSlice)
-            }
+			if inTransaction(c) {
+				errs[index] = getMultiTx(c, keySlice, dstSlice.Interface())
+			} else {
+				errs[index] = getMulti(c, keySlice, dstSlice)
+			}
 			wg.Done()
 		}()
 	}
@@ -199,22 +199,22 @@ func getMulti(c appengine.Context, keys []*datastore.Key, dst reflect.Value) err
 
 	gs := newGetMultiState(keys, dst)
 
-    if err := loadMemcache(c, gs); err != nil {
-        return err
-    }
+	if err := loadMemcache(c, gs); err != nil {
+		return err
+	}
 
-    // Lock memcache while we get new data from the datastore.
-    if err := lockMemcache(c, gs); err != nil {
-        return err
-    }
+	// Lock memcache while we get new data from the datastore.
+	if err := lockMemcache(c, gs); err != nil {
+		return err
+	}
 
 	if err := loadDatastore(c, gs); err != nil {
 		return err
 	}
 
-    if err := saveMemcache(c, gs); err != nil {
-        return err
-    }
+	if err := saveMemcache(c, gs); err != nil {
+		return err
+	}
 
 	if gs.errsExist {
 		return gs.errs
@@ -223,8 +223,8 @@ func getMulti(c appengine.Context, keys []*datastore.Key, dst reflect.Value) err
 }
 
 func getMultiTx(c appengine.Context,
-    keys []*datastore.Key, vals interface{}) error {
-    return datastore.GetMulti(c, keys, vals)
+	keys []*datastore.Key, vals interface{}) error {
+	return datastore.GetMulti(c, keys, vals)
 }
 
 func loadMemcache(c appengine.Context, gs *getMultiState) error {
