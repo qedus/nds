@@ -4,7 +4,6 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
-	"math/rand"
 	"reflect"
 )
 
@@ -26,6 +25,7 @@ func PutMulti(c appengine.Context,
 }
 
 // Put is a wrapper around PutMulti.
+/*
 func Put(c appengine.Context,
 	key *datastore.Key, val interface{}) (*datastore.Key, error) {
 	k, err := PutMulti(c, []*datastore.Key{key}, []interface{}{val})
@@ -34,6 +34,7 @@ func Put(c appengine.Context,
 	}
 	return k[0], nil
 }
+*/
 
 // putMulti puts the entities into the datastore and then its local cache.
 func putMulti(c appengine.Context,
@@ -45,8 +46,8 @@ func putMulti(c appengine.Context,
 		if !key.Incomplete() {
 			item := &memcache.Item{
 				Key:        createMemcacheKey(key),
-				Flags:      rand.Uint32(),
-				Value:      memcacheLock,
+				Flags:      lockItem,
+				Value:      itemLock(),
 				Expiration: memcacheLockTime,
 			}
 			lockMemcacheItems = append(lockMemcacheItems, item)

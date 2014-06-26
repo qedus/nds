@@ -1,6 +1,7 @@
 package nds_test
 
 import (
+	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
 	"github.com/qedus/nds"
@@ -19,24 +20,35 @@ func TestDelete(t *testing.T) {
 	}
 
 	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	keys := []*datastore.Key{key}
+	entities := make([]testEntity, 1)
+	entities[0].Val = 43
 
-	if _, err := nds.Put(c, key, &testEntity{43}); err != nil {
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
 
-	entity := &testEntity{}
-	if err := nds.Get(c, key, entity); err != nil {
+	entities = make([]testEntity, 1)
+	if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
+	entity := entities[0]
 	if entity.Val != 43 {
 		t.Fatal("incorrect entity.Val", entity.Val)
 	}
 
-	if err := nds.Delete(c, key); err != nil {
+	if err := nds.DeleteMulti(c, keys); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nds.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
-		t.Fatal("entity should be deleted")
+	keys = []*datastore.Key{key}
+	entities = make([]testEntity, 1)
+	err = nds.GetMulti(c, keys, entities)
+	if me, ok := err.(appengine.MultiError); ok {
+		if me[0] != datastore.ErrNoSuchEntity {
+			t.Fatal("entity should be deleted", entities)
+		}
+	} else {
+		t.Fatal("expected appengine.MultiError")
 	}
 }

@@ -24,11 +24,11 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 	for _, count := range []int{999, 1000, 1001} {
 
 		keys := []*datastore.Key{}
-		entities := []*testEntity{}
+		entities := []testEntity{}
 		for i := 0; i < count; i++ {
 			keys = append(keys,
 				datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
-			entities = append(entities, &testEntity{})
+			entities = append(entities, testEntity{})
 		}
 
 		err := nds.GetMulti(c, keys, entities)
@@ -60,11 +60,11 @@ func TestGetMultiNoErrors(t *testing.T) {
 
 		// Create entities.
 		keys := []*datastore.Key{}
-		entities := []*testEntity{}
+		entities := []testEntity{}
 		for i := 0; i < count; i++ {
 			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
-			entities = append(entities, &testEntity{i})
+			entities = append(entities, testEntity{i})
 		}
 
 		// Save entities.
@@ -106,16 +106,16 @@ func TestGetMultiErrorMix(t *testing.T) {
 
 		// Create entities.
 		keys := []*datastore.Key{}
-		entities := []*testEntity{}
+		entities := []testEntity{}
 		for i := 0; i < count; i++ {
 			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
-			entities = append(entities, &testEntity{i})
+			entities = append(entities, testEntity{i})
 		}
 
 		// Save every other entity.
 		putKeys := []*datastore.Key{}
-		putEntities := []*testEntity{}
+		putEntities := []testEntity{}
 		for i, key := range keys {
 			if i%2 == 0 {
 				putKeys = append(putKeys, key)
@@ -172,16 +172,16 @@ func TestMultiCache(t *testing.T) {
 
 	// Create entities.
 	keys := []*datastore.Key{}
-	entities := []*testEntity{}
+	entities := []testEntity{}
 	for i := 0; i < entityCount; i++ {
 		key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 		keys = append(keys, key)
-		entities = append(entities, &testEntity{i})
+		entities = append(entities, testEntity{i})
 	}
 
 	// Save every other entity.
 	putKeys := []*datastore.Key{}
-	putEntities := []*testEntity{}
+	putEntities := []testEntity{}
 	for i, key := range keys {
 		if i%2 == 0 {
 			putKeys = append(putKeys, key)
@@ -236,7 +236,7 @@ func TestMultiCache(t *testing.T) {
 
 	me, ok = err.(appengine.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T", me)
+		t.Fatalf("not an appengine.MultiError: %s", err)
 	}
 
 	// Check respEntities are in order.
@@ -305,25 +305,34 @@ func TestRunInTransaction(t *testing.T) {
 		Val int
 	}
 
-	entity := &testEntity{42}
 	key := datastore.NewKey(c, "Entity", "", 3, nil)
+	keys := []*datastore.Key{key}
+	entity := testEntity{42}
+	entities := []testEntity{entity}
 
-	if _, err := nds.Put(c, key, entity); err != nil {
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
 
 	err = nds.RunInTransaction(c, func(tc appengine.Context) error {
-		entity = &testEntity{}
-		if err := nds.Get(tc, key, entity); err != nil {
+		entities := make([]testEntity, 1, 1)
+		if err := nds.GetMulti(tc, keys, entities); err != nil {
 			t.Fatal(err)
 		}
+		entity := entities[0]
+
 		if entity.Val != 42 {
 			t.Fatalf("entity.Val != 42: %d", entity.Val)
 		}
-		entity.Val = 43
-		if putKey, err := nds.Put(tc, key, entity); err != nil {
+
+		entities[0].Val = 43
+
+		putKeys, err := nds.PutMulti(tc, keys, entities)
+		if err != nil {
 			t.Fatal(err)
-		} else if !putKey.Equal(key) {
+		} else if len(putKeys) != 1 {
+			t.Fatal("putKeys should be len 1")
+		} else if !putKeys[0].Equal(key) {
 			t.Fatal("keys not equal")
 		}
 		return nil
@@ -333,10 +342,11 @@ func TestRunInTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entity = &testEntity{}
-	if err := nds.Get(c, key, entity); err != nil {
+	entities = make([]testEntity, 1, 1)
+	if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
+	entity = entities[0]
 	if entity.Val != 43 {
 		t.Fatalf("entity.Val != 43: %d", entity.Val)
 	}

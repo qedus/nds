@@ -3,9 +3,9 @@ package nds
 import (
 	"appengine/datastore"
 	"appengine/memcache"
-	"bytes"
-	"encoding/gob"
+	"encoding/binary"
 	"errors"
+	"math/rand"
 	"reflect"
 	"time"
 )
@@ -22,16 +22,25 @@ const (
 )
 
 var (
-	// memcacheLock is the value that is used to lock memcache.
-	memcacheLock = []byte{0}
-
 	typeOfPropertyLoadSaver = reflect.TypeOf(
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
 )
 
+const (
+	noneItem uint32 = iota
+	entityItem
+	lockItem
+)
+
+func itemLock() []byte {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, rand.Uint32())
+	return b
+}
+
 func isItemLocked(item *memcache.Item) bool {
-	return bytes.Equal(item.Value, memcacheLock)
+	return item.Flags == lockItem
 }
 
 func checkArgs(keys []*datastore.Key, v reflect.Value) error {
@@ -52,68 +61,13 @@ func checkArgs(keys []*datastore.Key, v reflect.Value) error {
 		return errors.New("nds: PropertyLoadSaver not supporded")
 	}
 
-	switch elemType.Kind() {
-	case reflect.Struct:
+	if elemType.Kind() == reflect.Struct {
 		return nil
-	case reflect.Interface:
-		return nil
-	case reflect.Ptr:
-		elemType = elemType.Elem()
-		if elemType.Kind() == reflect.Struct {
-			return nil
-		}
 	}
 
-	return errors.New("nds: vals must be a slice of pointers")
-}
-
-func addrValue(v reflect.Value) reflect.Value {
-	if v.Kind() == reflect.Struct {
-		return v.Addr()
-	}
-	return v
-}
-
-func setValue(index int, vals reflect.Value, pl *datastore.PropertyList) error {
-	elem := addrValue(vals.Index(index))
-	return loadStruct(elem.Interface(), pl)
-}
-
-func decodePropertyList(data []byte) (datastore.PropertyList, error) {
-	pl := datastore.PropertyList{}
-	return pl, gob.NewDecoder(bytes.NewBuffer(data)).Decode(&pl)
-}
-
-func encodePropertyList(pl datastore.PropertyList) ([]byte, error) {
-	b := &bytes.Buffer{}
-	err := gob.NewEncoder(b).Encode(pl)
-	return b.Bytes(), err
+	return errors.New("nds: vals must be a slice of structs")
 }
 
 func createMemcacheKey(key *datastore.Key) string {
 	return memcachePrefix + key.Encode()
-}
-
-// saveStruct saves src to a datastore.PropertyList.
-func saveStruct(src interface{}, pl *datastore.PropertyList) error {
-	c, err := make(chan datastore.Property), make(chan error)
-	go func() {
-		err <- datastore.SaveStruct(src, c)
-	}()
-	for p := range c {
-		*pl = append(*pl, p)
-	}
-	return <-err
-}
-
-// loadStruct loads a datastore.PropertyList into dst.
-func loadStruct(dst interface{}, pl *datastore.PropertyList) error {
-	c := make(chan datastore.Property)
-	go func() {
-		for _, p := range *pl {
-			c <- p
-		}
-		close(c)
-	}()
-	return datastore.LoadStruct(dst, c)
 }
