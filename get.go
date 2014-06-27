@@ -63,13 +63,14 @@ func GetMulti(c appengine.Context,
 
 		index := i
 		keySlice := keys[lo:hi]
-		valsSlice := v.Slice(lo, hi)
+		valSlice := v.Slice(lo, hi)
 
 		go func() {
 			if inTransaction(c) {
-				errs[index] = getMultiTx(c, keySlice, valsSlice.Interface())
+				errs[index] = datastore.GetMulti(c,
+					keySlice, valSlice.Interface())
 			} else {
-				errs[index] = getMulti(c, keySlice, valsSlice)
+				errs[index] = getMulti(c, keySlice, valSlice)
 			}
 			wg.Done()
 		}()
@@ -198,11 +199,6 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 	return me
 }
 
-func getMultiTx(c appengine.Context,
-	keys []*datastore.Key, vals interface{}) error {
-	return datastore.GetMulti(c, keys, vals)
-}
-
 type cacheState int
 
 const (
@@ -237,7 +233,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
 	for i, memcacheKey := range memcacheKeys {
 		if item, ok := items[memcacheKey]; ok {
-			if isItemLocked(item) {
+			if item.Flags == lockItem {
 				cacheItems[i].state = externalLock
 			} else {
 				cacheItems[i].item = item
@@ -293,7 +289,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	for i, cacheItem := range cacheItems {
 		if cacheItem.state == miss {
 			item := items[cacheItem.memcacheKey]
-			if isItemLocked(item) {
+			if item.Flags == lockItem {
 				if item.Flags == cacheItem.item.Flags {
 					cacheItems[i].item = item
 					cacheItems[i].state = internalLock

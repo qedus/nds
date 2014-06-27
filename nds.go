@@ -2,7 +2,6 @@ package nds
 
 import (
 	"appengine/datastore"
-	"appengine/memcache"
 	"encoding/binary"
 	"errors"
 	"math/rand"
@@ -37,10 +36,6 @@ func itemLock() []byte {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, rand.Uint32())
 	return b
-}
-
-func isItemLocked(item *memcache.Item) bool {
-	return item.Flags == lockItem
 }
 
 func checkArgs(keys []*datastore.Key, v reflect.Value) error {
