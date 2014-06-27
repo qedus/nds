@@ -17,8 +17,6 @@ import (
 // datastore.GetMulti as required concurrently and collating the results.
 const getMultiLimit = 1000
 
-var errUnknownMemcacheItem = errors.New("nds: unknown memcache item")
-
 // GetMulti works just like datastore.GetMulti except for two important
 // advantages:
 //
