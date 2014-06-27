@@ -13,7 +13,7 @@ const putMultiLimit = 500
 
 // PutMulti works just like datastore.PutMulti except it interacts
 // appropriately with NDS's caching strategy.
-// Currently, vals can only be slices of struct pointers, []*S.
+// vals can only be slices of structs, []S.
 func PutMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
@@ -23,18 +23,6 @@ func PutMulti(c appengine.Context,
 
 	return putMulti(c, keys, vals)
 }
-
-// Put is a wrapper around PutMulti.
-/*
-func Put(c appengine.Context,
-	key *datastore.Key, val interface{}) (*datastore.Key, error) {
-	k, err := PutMulti(c, []*datastore.Key{key}, []interface{}{val})
-	if err != nil {
-		return nil, err
-	}
-	return k[0], nil
-}
-*/
 
 // putMulti puts the entities into the datastore and then its local cache.
 func putMulti(c appengine.Context,

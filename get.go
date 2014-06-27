@@ -16,26 +16,33 @@ import (
 // datastore.GetMulti as required concurrently and collating the results.
 const getMultiLimit = 1000
 
-// GetMulti works just like datastore.GetMulti except for two important
+// GetMulti works similar to datastore.GetMulti except for two important
 // advantages:
 //
 // 1) It removes the API limit of 1000 entities per request by
 // calling the datastore as many times as required to fetch all the keys. It
 // does this efficiently and concurrently.
 //
-// 2) If you use an appengine.Context created from this packages NewContext the
-// GetMulti function will automatically invoke a caching mechanism identical
-// to the Python ndb package. It also has the same strong cache consistency
-// guarantees as the Python ndb package. It will check local memory for an
-// entity, then check memcache and then the datastore. This has the potential
-// to greatly speed up your entity access and reduce Google App Engine costs.
-// Note that if you use GetMulti with this packages NewContext, you must do all
-// your other datastore accesses with other methods from this package to ensure
-// cache consistency.
+// 2) GetMulti function will automatically use memcache where possible before
+// accssing the datastore. It uses a caching mechanism similar to the Python
+// ndb package. However consistency is improved as NDB consistency issue
+// http://goo.gl/3ByVlA is not an issue here or accessing the same key
+// concurrently.
 //
+// If memcache is not working for any reason, GetMulti will default to using
+// the datastore without compromising cache consistency.
+//
+// Important: If you use nds.GetMulti, you must also use the NDS put and delete
+// functions in all your code touching the datastore to ensure data consistency.
+// This includes using nds.RunInTransaction instead of
+// datastore.RunInTransaction.
+// 
 // Increase the datastore timeout if you get datastore_v3: TIMEOUT errors when
 // getting thousands of entities. You can do this using
 // http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
+//
+// vals currently only takes slices of structs. It does not take slices of
+// pointers, interfaces or datastore.PropertyLoadSaver.
 func GetMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) error {
 
@@ -103,22 +110,6 @@ func GetMulti(c appengine.Context,
 	return groupedErrs
 }
 
-// Get is a wrapper around GetMulti. Its return values are identical to
-// datastore.Get.
-/*
-func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
-    v := reflect.ValueOf(val)
-    sliceType := reflect.SliceOf(v.Type())
-    slice := reflect.MakeSlice(sliceType, 1, 1)
-    slice.Index(0).Set(v)
-    err := getMulti(c, []*datastore.Key{key}, slice)
-	if me, ok := err.(appengine.MultiError); ok {
-		return me[0]
-	}
-	return err
-}
-*/
-
 type cacheState int
 
 const (
@@ -140,44 +131,12 @@ type cacheItem struct {
 	state cacheState
 }
 
-// getMulti attempts to get entities from local cache, memcache, then the
-// datastore. It also tries to replenish each cache in turn if an entity is
-// available.
-// The not so obvious part is replenishing memcache with the datastore to
-// ensure we don't write stale values.
-//
-// Here's how it works assuming there is nothing in local cache. (Note this is
-// taken form Python ndb):
-// Firstly get as many entities from memcache as possible. The returned values
-// can be in one of three states: No entity, locked value or the acutal entity.
-//
-// Actual entity case:
-// If the value from memcache is an actual entity then replensish the local
-// cache and return that entity to the caller.
-//
-// Locked entity case:
-// If the value is locked then just ignore that entity and go to the datastore
-// to see if it exists.
-//
-// No entity case:
-// If no entity is returned from memcache then do the following things to ensure
-// we don't accidentally update memcache with stale values.
-// 1) Lock that entity in memcache by setting memcacheLock on that entities key.
-//    Note that the lock timeout is 32 seconds to cater for a datastore edge
-//    case which I currently can't quite remember.
-// 2) Immediately get that entity back from memcache ensuring the compare and
-//    swap ID is set.
-// 3) Get the entity from the datastore.
-// 4) Set the entity in memcache using compare and swap. If this succeeds then
-//    we are guaranteed to have the latest value in memcache. If it fails due
-//    to a CAS failure then there must have been a concurrent write to
-//    memcache and now the memcache for that key is out of action for 32
-//    seconds.
-//
-// Note that within a transaction, much of this functionality is lost to ensure
-// datastore consistency.
-//
-// vals argument must be a slice.
+// getMulti attempts to get entities from, memcache, then the datastore.
+// datastore. It also tries to replenish memcache if needed available. It does
+// this in such a way that GetMulti will never get stale results even if the
+// function, datastore or server fails at any point. The caching strategy is
+// borrowed from Python ndb with some improvements that eliminate some
+// consistency issues surrounding ndb, including http://goo.gl/3ByVlA.
 func getMulti(c appengine.Context, keys []*datastore.Key,
 	vals reflect.Value) error {
 
@@ -228,8 +187,6 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	}
 
 	items, err := memcache.GetMulti(c, memcacheKeys)
-	// Memcache has failed so treat it as locked and go to the datastore for
-	// the entities.
 	if err != nil {
 		for i := range cacheItems {
 			cacheItems[i].state = externalLock

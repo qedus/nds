@@ -6,18 +6,11 @@ import (
 	"appengine/memcache"
 )
 
-// DeleteMulti works just like datastore.DeleteMulti except also cleans up
-// local and memcache if a context from NewContext is used.
+// DeleteMulti works just like datastore.DeleteMulti except it maintains
+// cache consistency with other NDS methods.
 func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	return deleteMulti(c, keys)
 }
-
-// Delete is a wrapper around DeleteMulti.
-/*
-func Delete(c appengine.Context, key *datastore.Key) error {
-	return DeleteMulti(c, []*datastore.Key{key})
-}
-*/
 
 func deleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	lockMemcacheItems := []*memcache.Item{}
