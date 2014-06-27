@@ -17,6 +17,8 @@ import (
 // datastore.GetMulti as required concurrently and collating the results.
 const getMultiLimit = 1000
 
+var errUnknownMemcacheItem = errors.New("nds: unknown memcache item")
+
 // GetMulti works just like datastore.GetMulti except for two important
 // advantages:
 //
@@ -120,6 +122,27 @@ func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 }
 */
 
+type cacheState int
+
+const (
+	miss cacheState = iota
+	hit
+	internalLock
+	externalLock
+	done
+)
+
+type cacheItem struct {
+	key         *datastore.Key
+	memcacheKey string
+
+	val reflect.Value
+
+	item *memcache.Item
+
+	state cacheState
+}
+
 // getMulti attempts to get entities from local cache, memcache, then the
 // datastore. It also tries to replenish each cache in turn if an entity is
 // available.
@@ -166,6 +189,7 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 		cacheItems[i].key = key
 		cacheItems[i].memcacheKey = createMemcacheKey(key)
 		cacheItems[i].val = vals.Index(i)
+		cacheItems[i].state = miss
 	}
 
 	if err := loadMemcache(c, cacheItems); err != nil {
@@ -199,26 +223,6 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 	return me
 }
 
-type cacheState int
-
-const (
-	miss cacheState = iota
-	present
-	internalLock
-	externalLock
-)
-
-type cacheItem struct {
-	key         *datastore.Key
-	memcacheKey string
-
-	val reflect.Value
-
-	item *memcache.Item
-
-	state cacheState
-}
-
 func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
 	memcacheKeys := make([]string, len(cacheItems))
@@ -227,22 +231,35 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	}
 
 	items, err := memcache.GetMulti(c, memcacheKeys)
+	// Memcache has failed so treat it as locked and go to the datastore for
+	// the entities.
 	if err != nil {
-		return err
+		for i := range cacheItems {
+			cacheItems[i].state = externalLock
+		}
+		c.Warningf("loadMemcache GetMulti %s", err)
+		return nil
 	}
 
 	for i, memcacheKey := range memcacheKeys {
 		if item, ok := items[memcacheKey]; ok {
-			if item.Flags == lockItem {
+			switch item.Flags {
+			case lockItem:
 				cacheItems[i].state = externalLock
-			} else {
-				cacheItems[i].item = item
-				cacheItems[i].state = present
+			case noneItem:
+				cacheItems[i].state = done
+			case entityItem:
 				err := unmarshal(item.Value,
 					cacheItems[i].val.Addr().Interface())
-				if err != nil {
-					return err
+				if err == nil {
+					cacheItems[i].state = done
+				} else {
+					c.Warningf("loadMemcache unmarshal %s", err)
+					cacheItems[i].state = externalLock
 				}
+			default:
+				c.Warningf("loadMemcache unknown item.Flags %d", item.Flags)
+				cacheItems[i].state = externalLock
 			}
 		}
 	}
@@ -251,8 +268,8 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
 func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
-	lockItems := make([]*memcache.Item, 0, len(cacheItems))
 	lockMemcacheKeys := make([]string, 0, len(cacheItems))
+	lockItems := make([]*memcache.Item, 0, len(cacheItems))
 	for i, cacheItem := range cacheItems {
 		if cacheItem.state == miss {
 
@@ -268,38 +285,56 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 		}
 	}
 
-	// This is currently conservative behavoiur. We could see if a multi error
-	// is returned, loop through it and mark any items appropriately that were
-	// that were not added as locked.
+	// We don't care if there are errors here.
 	if err := memcache.AddMulti(c, lockItems); err != nil {
-		return err
+		c.Warningf("lockMemcache AddMulti %s", err)
 	}
 
+	// Get the items again so we can use CAS when updating the cache.
 	items, err := memcache.GetMulti(c, lockMemcacheKeys)
+
+	// Cache failed so forget about it and just use the datastore.
 	if err != nil {
-		return err
+		for i, cacheItem := range cacheItems {
+			if cacheItem.state == miss {
+				cacheItems[i].state = externalLock
+			}
+		}
+		c.Warningf("lockMemcache GetMulti %s", err)
+		return nil
 	}
 
-	// This is currently conservative behaviour. We could set states to
-	// present and miss.
-	if len(lockMemcacheKeys) != len(items) {
-		return errors.New("nds: not all memcache locks obtained")
-	}
-
+	// Cache worked so figure out what items we got.
 	for i, cacheItem := range cacheItems {
 		if cacheItem.state == miss {
-			item := items[cacheItem.memcacheKey]
-			if item.Flags == lockItem {
-				if item.Flags == cacheItem.item.Flags {
-					cacheItems[i].item = item
-					cacheItems[i].state = internalLock
-				} else {
-					cacheItems[i].item = nil
+			if item, ok := items[cacheItem.memcacheKey]; ok {
+				switch item.Flags {
+				case lockItem:
+					if bytes.Equal(item.Value, cacheItem.item.Value) {
+						cacheItems[i].item = item
+						cacheItems[i].state = internalLock
+					} else {
+						cacheItems[i].state = externalLock
+					}
+				case noneItem:
+					cacheItems[i].state = done
+				case entityItem:
+					err := unmarshal(item.Value,
+						cacheItems[i].val.Addr().Interface())
+					if err == nil {
+						cacheItems[i].state = done
+					} else {
+						c.Warningf("lockMemcache unmarshal %s", err)
+						cacheItems[i].state = externalLock
+					}
+				default:
+					c.Warningf("lockMemcache unknown item.Flags %d", item.Flags)
 					cacheItems[i].state = externalLock
 				}
 			} else {
-				cacheItems[i].item = item
-				cacheItems[i].state = present
+				// We just added a memcache item but it now isn't available so
+				// treat it as an extarnal lock.
+				cacheItems[i].state = externalLock
 			}
 		}
 	}
@@ -311,7 +346,8 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 	keys := make([]*datastore.Key, 0, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
 	for i, cacheItem := range cacheItems {
-		if cacheItem.state == internalLock || cacheItem.state == externalLock {
+		switch cacheItem.state {
+		case internalLock, externalLock:
 			keys = append(keys, cacheItem.key)
 			cacheItemsIndex = append(cacheItemsIndex, i)
 		}
@@ -331,15 +367,28 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 	}
 
 	for i, index := range cacheItemsIndex {
-		if me[i] == nil {
-			cacheItems[index].val.Set(vals.Index(i))
-		} else if me[i] == datastore.ErrNoSuchEntity {
-			cacheItems[index].state = miss
-		} else {
+		switch me[i] {
+		case nil:
+			val := vals.Index(i)
+			cacheItems[index].val.Set(val)
+			if cacheItems[index].state == internalLock {
+				cacheItems[index].item.Flags = entityItem
+				if data, err := marshal(vals.Index(i).Interface()); err == nil {
+					cacheItems[index].item.Value = data
+				} else {
+					cacheItems[index].state = externalLock
+					c.Warningf("loadDatastore marshal %s", err)
+				}
+			}
+		case datastore.ErrNoSuchEntity:
+			if cacheItems[index].state == internalLock {
+				cacheItems[index].item.Flags = noneItem
+				cacheItems[index].item.Value = []byte{}
+			}
+		default:
 			return me[i]
 		}
 	}
-
 	return nil
 }
 
@@ -348,20 +397,16 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	saveItems := make([]*memcache.Item, 0, len(cacheItems))
 	for _, cacheItem := range cacheItems {
 		if cacheItem.state == internalLock {
-			value, err := marshal(cacheItem.val.Interface())
-			if err != nil {
-				return err
-			}
-			item := cacheItem.item
-			item.Flags = entityItem
-			item.Value = value
-			saveItems = append(saveItems, item)
+			saveItems = append(saveItems, cacheItem.item)
 		}
 	}
 
 	// This is conservative. We could filter out appengine.MultiError and only
 	// return other types of errors.
-	return memcache.CompareAndSwapMulti(c, saveItems)
+	if err := memcache.CompareAndSwapMulti(c, saveItems); err != nil {
+		c.Warningf("saveMemcache CompareAndSwapMulti %s", err)
+	}
+	return nil
 }
 
 func marshal(v interface{}) ([]byte, error) {
