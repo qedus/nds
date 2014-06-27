@@ -124,7 +124,6 @@ type cacheState int
 
 const (
 	miss cacheState = iota
-	hit
 	internalLock
 	externalLock
 	done
