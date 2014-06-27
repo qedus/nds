@@ -36,7 +36,7 @@ const getMultiLimit = 1000
 // functions in all your code touching the datastore to ensure data consistency.
 // This includes using nds.RunInTransaction instead of
 // datastore.RunInTransaction.
-// 
+//
 // Increase the datastore timeout if you get datastore_v3: TIMEOUT errors when
 // getting thousands of entities. You can do this using
 // http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
