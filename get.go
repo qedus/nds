@@ -137,6 +137,7 @@ type cacheItem struct {
 	memcacheKey string
 
 	val reflect.Value
+	err error
 
 	item *memcache.Item
 
@@ -211,8 +212,8 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 
 	me, errsNil := make(appengine.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {
-		if cacheItem.state == miss {
-			me[i] = datastore.ErrNoSuchEntity
+		if cacheItem.err != nil {
+			me[i] = cacheItem.err
 			errsNil = false
 		}
 	}
@@ -248,6 +249,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 				cacheItems[i].state = externalLock
 			case noneItem:
 				cacheItems[i].state = done
+				cacheItems[i].err = datastore.ErrNoSuchEntity
 			case entityItem:
 				err := unmarshal(item.Value,
 					cacheItems[i].val.Addr().Interface())
@@ -268,8 +270,8 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
 func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
-	lockMemcacheKeys := make([]string, 0, len(cacheItems))
 	lockItems := make([]*memcache.Item, 0, len(cacheItems))
+	lockMemcacheKeys := make([]string, 0, len(cacheItems))
 	for i, cacheItem := range cacheItems {
 		if cacheItem.state == miss {
 
@@ -373,6 +375,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 			cacheItems[index].val.Set(val)
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = entityItem
+				cacheItems[index].item.Expiration = 0
 				if data, err := marshal(vals.Index(i).Interface()); err == nil {
 					cacheItems[index].item.Value = data
 				} else {
@@ -383,10 +386,13 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 		case datastore.ErrNoSuchEntity:
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = noneItem
+				cacheItems[index].item.Expiration = 0
 				cacheItems[index].item.Value = []byte{}
 			}
+			cacheItems[index].err = datastore.ErrNoSuchEntity
 		default:
-			return me[i]
+			cacheItems[index].state = externalLock
+			cacheItems[index].err = me[i]
 		}
 	}
 	return nil
