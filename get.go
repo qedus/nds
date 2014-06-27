@@ -6,7 +6,6 @@ import (
 	"appengine/memcache"
 	"bytes"
 	"encoding/gob"
-	"errors"
 	"reflect"
 	"sync"
 )
@@ -317,6 +316,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 					}
 				case noneItem:
 					cacheItems[i].state = done
+					cacheItems[i].err = datastore.ErrNoSuchEntity
 				case entityItem:
 					err := unmarshal(item.Value,
 						cacheItems[i].val.Addr().Interface())
