@@ -17,11 +17,27 @@ const putMultiLimit = 500
 func PutMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
-	if err := checkArgs(keys, reflect.ValueOf(vals)); err != nil {
+	if err := checkMultiArgs(keys, reflect.ValueOf(vals)); err != nil {
 		return nil, err
 	}
 
 	return putMulti(c, keys, vals)
+}
+
+func Put(c appengine.Context,
+	key *datastore.Key, val interface{}) (*datastore.Key, error) {
+
+	if err := checkArgs(key, val); err != nil {
+		return nil, err
+	}
+
+	keys, err := putMulti(c, []*datastore.Key{key}, []interface{}{val})
+	if me, ok := err.(appengine.MultiError); ok {
+		return nil, me[0]
+	} else if err != nil {
+		return nil, err
+	}
+	return keys[0], nil
 }
 
 // putMulti puts the entities into the datastore and then its local cache.

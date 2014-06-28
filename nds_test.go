@@ -9,6 +9,70 @@ import (
 	"testing"
 )
 
+func TestPutGetDelete(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		Val int
+	}
+
+	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
+	key, err := nds.Put(c, incompleteKey, &testEntity{43})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if key.Incomplete() {
+		t.Fatal("Key is incomplete")
+	}
+
+	te := &testEntity{}
+	if err := nds.Get(c, key, te); err != nil {
+		t.Fatal(err)
+	}
+
+	if te.Val != 43 {
+		t.Fatal("te.Val != 43", te.Val)
+	}
+
+	// Get from cache.
+	te = &testEntity{}
+	if err := nds.Get(c, key, te); err != nil {
+		t.Fatal(err)
+	}
+
+	if te.Val != 43 {
+		t.Fatal("te.Val != 43", te.Val)
+	}
+
+	// Change value.
+	if _, err := nds.Put(c, key, &testEntity{64}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get from cache.
+	te = &testEntity{}
+	if err := nds.Get(c, key, te); err != nil {
+		t.Fatal(err)
+	}
+
+	if te.Val != 64 {
+		t.Fatal("te.Val != 64", te.Val)
+	}
+
+	if err := nds.Delete(c, key); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := nds.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
+		t.Fatal("expected datastore.ErrNoSuchEntity")
+	}
+}
+
 func TestGetMultiNoSuchEntity(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
@@ -24,11 +88,11 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 	for _, count := range []int{999, 1000, 1001} {
 
 		keys := []*datastore.Key{}
-		entities := []testEntity{}
+		entities := []*testEntity{}
 		for i := 0; i < count; i++ {
 			keys = append(keys,
 				datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
-			entities = append(entities, testEntity{})
+			entities = append(entities, &testEntity{})
 		}
 
 		err := nds.GetMulti(c, keys, entities)
@@ -60,11 +124,11 @@ func TestGetMultiNoErrors(t *testing.T) {
 
 		// Create entities.
 		keys := []*datastore.Key{}
-		entities := []testEntity{}
+		entities := []*testEntity{}
 		for i := 0; i < count; i++ {
 			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
-			entities = append(entities, testEntity{i})
+			entities = append(entities, &testEntity{i})
 		}
 
 		// Save entities.

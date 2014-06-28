@@ -47,7 +47,7 @@ func GetMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) error {
 
 	v := reflect.ValueOf(vals)
-	if err := checkArgs(keys, v); err != nil {
+	if err := checkMultiArgs(keys, v); err != nil {
 		return err
 	}
 
@@ -108,6 +108,24 @@ func GetMulti(c appengine.Context,
 		}
 	}
 	return groupedErrs
+}
+
+func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
+
+	if err := checkArgs(key, val); err != nil {
+		return err
+	}
+
+	v := reflect.ValueOf(val)
+	sliceType := reflect.SliceOf(v.Type())
+	valSlice := reflect.MakeSlice(sliceType, 1, 1)
+	valSlice.Index(0).Set(v)
+
+	err := getMulti(c, []*datastore.Key{key}, valSlice)
+	if me, ok := err.(appengine.MultiError); ok {
+		return me[0]
+	}
+	return err
 }
 
 type cacheState int
@@ -310,9 +328,11 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 	}
 
 	elemType := cacheItems[0].val.Type()
+	if elemType.Kind() == reflect.Ptr {
+		elemType = reflect.Indirect(cacheItems[0].val).Type()
+	}
 	sliceType := reflect.SliceOf(elemType)
 	vals := reflect.MakeSlice(sliceType, len(keys), len(keys))
-
 	var me appengine.MultiError
 	if err := datastore.GetMulti(c, keys, vals.Interface()); err == nil {
 		me = make(appengine.MultiError, len(keys))
@@ -325,8 +345,8 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 	for i, index := range cacheItemsIndex {
 		switch me[i] {
 		case nil:
-			val := vals.Index(i)
-			cacheItems[index].val.Set(val)
+			setValue(cacheItems[index].val, vals.Index(i))
+
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = entityItem
 				cacheItems[index].item.Expiration = 0
@@ -379,4 +399,18 @@ func marshal(v interface{}) ([]byte, error) {
 
 func unmarshal(data []byte, v interface{}) error {
 	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(v)
+}
+
+func setValue(dst reflect.Value, src reflect.Value) {
+	if dst.Kind() == reflect.Struct {
+		if src.Kind() != reflect.Struct {
+			src = reflect.Indirect(src)
+		}
+		dst.Set(src)
+	} else if dst.Kind() == reflect.Ptr {
+		if src.Kind() != reflect.Ptr {
+			src = src.Addr()
+		}
+		dst.Elem().Set(src.Elem())
+	}
 }

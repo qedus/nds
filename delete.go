@@ -4,12 +4,25 @@ import (
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
+	"errors"
 )
 
 // DeleteMulti works just like datastore.DeleteMulti except it maintains
 // cache consistency with other NDS methods.
 func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	return deleteMulti(c, keys)
+}
+
+func Delete(c appengine.Context, key *datastore.Key) error {
+	if key == nil {
+		return errors.New("nds: key is nil")
+	}
+
+	err := deleteMulti(c, []*datastore.Key{key})
+	if me, ok := err.(appengine.MultiError); ok {
+		return me[0]
+	}
+	return err
 }
 
 func deleteMulti(c appengine.Context, keys []*datastore.Key) error {
