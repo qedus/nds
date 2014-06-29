@@ -140,8 +140,6 @@ type cacheItem struct {
 	val reflect.Value
 	err error
 
-	sliceType reflect.Type
-
 	item *memcache.Item
 
 	state cacheState
@@ -161,7 +159,6 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 		cacheItems[i].key = key
 		cacheItems[i].memcacheKey = createMemcacheKey(key)
 		cacheItems[i].val = vals.Index(i)
-		cacheItems[i].sliceType = vals.Type()
 		cacheItems[i].state = miss
 	}
 
@@ -174,7 +171,7 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 		return err
 	}
 
-	if err := loadDatastore(c, cacheItems); err != nil {
+	if err := loadDatastore(c, cacheItems, vals.Type()); err != nil {
 		return err
 	}
 
@@ -313,10 +310,11 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	return nil
 }
 
-func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
+func loadDatastore(c appengine.Context, cacheItems []cacheItem,
+	valsType reflect.Type) error {
 
 	keys := make([]*datastore.Key, 0, len(cacheItems))
-	vals := reflect.MakeSlice(cacheItems[0].sliceType, 0, len(cacheItems))
+	vals := reflect.MakeSlice(valsType, 0, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
 
 	for i, cacheItem := range cacheItems {
