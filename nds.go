@@ -79,15 +79,18 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 		return errors.New("nds: PropertyLoadSaver not supporded")
 	}
 
-	if elemType.Kind() == reflect.Struct {
+	switch elemType.Kind() {
+	case reflect.Struct:
 		return nil
-	}
-
-	if elemType.Kind() == reflect.Ptr {
+	case reflect.Interface:
 		return nil
+	case reflect.Ptr:
+		elemType = elemType.Elem()
+		if elemType.Kind() == reflect.Struct {
+			return nil
+		}
 	}
-
-	return errors.New("nds: vals must be a slice of structs or pointers")
+	return errors.New("nds: unsupported vals type")
 }
 
 func createMemcacheKey(key *datastore.Key) string {

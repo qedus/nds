@@ -116,12 +116,8 @@ func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 		return err
 	}
 
-	v := reflect.ValueOf(val)
-	sliceType := reflect.SliceOf(v.Type())
-	valSlice := reflect.MakeSlice(sliceType, 1, 1)
-	valSlice.Index(0).Set(v)
-
-	err := getMulti(c, []*datastore.Key{key}, valSlice)
+	vals := reflect.ValueOf([]interface{}{val})
+	err := getMulti(c, []*datastore.Key{key}, vals)
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
 	}
@@ -144,6 +140,8 @@ type cacheItem struct {
 	val reflect.Value
 	err error
 
+	sliceType reflect.Type
+
 	item *memcache.Item
 
 	state cacheState
@@ -163,6 +161,7 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 		cacheItems[i].key = key
 		cacheItems[i].memcacheKey = createMemcacheKey(key)
 		cacheItems[i].val = vals.Index(i)
+		cacheItems[i].sliceType = vals.Type()
 		cacheItems[i].state = miss
 	}
 
@@ -222,8 +221,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 				cacheItems[i].state = done
 				cacheItems[i].err = datastore.ErrNoSuchEntity
 			case entityItem:
-				err := unmarshal(item.Value,
-					cacheItems[i].val.Addr().Interface())
+				err := unmarshal(item.Value, cacheItems[i].val)
 				if err == nil {
 					cacheItems[i].state = done
 				} else {
@@ -293,8 +291,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 					cacheItems[i].state = done
 					cacheItems[i].err = datastore.ErrNoSuchEntity
 				case entityItem:
-					err := unmarshal(item.Value,
-						cacheItems[i].val.Addr().Interface())
+					err := unmarshal(item.Value, cacheItems[i].val)
 					if err == nil {
 						cacheItems[i].state = done
 					} else {
@@ -317,22 +314,20 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 }
 
 func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
+
 	keys := make([]*datastore.Key, 0, len(cacheItems))
+	vals := reflect.MakeSlice(cacheItems[0].sliceType, 0, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
+
 	for i, cacheItem := range cacheItems {
 		switch cacheItem.state {
 		case internalLock, externalLock:
 			keys = append(keys, cacheItem.key)
+			vals = reflect.Append(vals, cacheItem.val)
 			cacheItemsIndex = append(cacheItemsIndex, i)
 		}
 	}
 
-	elemType := cacheItems[0].val.Type()
-	if elemType.Kind() == reflect.Ptr {
-		elemType = reflect.Indirect(cacheItems[0].val).Type()
-	}
-	sliceType := reflect.SliceOf(elemType)
-	vals := reflect.MakeSlice(sliceType, len(keys), len(keys))
 	var me appengine.MultiError
 	if err := datastore.GetMulti(c, keys, vals.Interface()); err == nil {
 		me = make(appengine.MultiError, len(keys))
@@ -350,7 +345,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem) error {
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = entityItem
 				cacheItems[index].item.Expiration = 0
-				if data, err := marshal(vals.Index(i).Interface()); err == nil {
+				if data, err := marshal(vals.Index(i)); err == nil {
 					cacheItems[index].item.Value = data
 				} else {
 					cacheItems[index].state = externalLock
@@ -389,16 +384,23 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	return nil
 }
 
-func marshal(v interface{}) ([]byte, error) {
+func marshal(v reflect.Value) ([]byte, error) {
 	buf := bytes.Buffer{}
-	if err := gob.NewEncoder(&buf).Encode(v); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(v.Interface()); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func unmarshal(data []byte, v interface{}) error {
-	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(v)
+func unmarshal(data []byte, v reflect.Value) error {
+	v = reflect.Indirect(v)
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Ptr {
+		v = v.Addr()
+	}
+	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(v.Interface())
 }
 
 func setValue(dst reflect.Value, src reflect.Value) {

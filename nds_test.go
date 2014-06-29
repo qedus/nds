@@ -73,6 +73,87 @@ func TestPutGetDelete(t *testing.T) {
 	}
 }
 
+func TestInterfaces(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		Val int
+	}
+
+	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
+	incompleteKeys := []*datastore.Key{incompleteKey}
+	entities := []interface{}{&testEntity{43}}
+	keys, err := nds.PutMulti(c, incompleteKeys, entities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 1 {
+		t.Fatal("len(keys) != 1")
+	}
+
+	if keys[0].Incomplete() {
+		t.Fatal("Key is incomplete")
+	}
+
+	entities = []interface{}{&testEntity{}}
+	if err := nds.GetMulti(c, keys, entities); err != nil {
+		//if err := datastore.GetMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	if entities[0].(*testEntity).Val != 43 {
+		t.Fatal("te.Val != 43")
+	}
+
+	// Get from cache.
+	entities = []interface{}{&testEntity{}}
+	if err := nds.GetMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	if entities[0].(*testEntity).Val != 43 {
+		t.Fatal("te.Val != 43")
+	}
+
+	// Change value.
+	entities = []interface{}{&testEntity{64}}
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get from datastore with struct.
+	entities = []interface{}{&testEntity{}}
+	if err := nds.GetMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	if entities[0].(*testEntity).Val != 64 {
+		t.Fatal("te.Val != 64")
+	}
+
+	if err := nds.DeleteMulti(c, keys); err != nil {
+		t.Fatal(err)
+	}
+
+	entities = []interface{}{testEntity{}}
+	err = nds.GetMulti(c, keys, entities)
+	if me, ok := err.(appengine.MultiError); ok {
+
+		if len(me) != 1 {
+			t.Fatal("expected 1 appengine.MultiError")
+		}
+		if me[0] != datastore.ErrNoSuchEntity {
+			t.Fatal("expected datastore.ErrNoSuchEntity")
+		}
+	} else {
+		t.Fatal("expected datastore.ErrNoSuchEntity", err)
+	}
+}
+
 func TestGetMultiNoSuchEntity(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
