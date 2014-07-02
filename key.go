@@ -58,6 +58,15 @@ func DecodeKey(encoded string) (*Key, error) {
 	return &Key{key}, err
 }
 
+func (k *Key) GobDecode(buf []byte) error {
+    key := &datastore.Key{}
+    if err := key.GobDecode(buf); err != nil {
+        return err
+    }
+    k.Key = key
+    return nil
+}
+
 func AllocateIDs(c appengine.Context,
 	kind string, parent *Key, n int) (low, high int64, err error) {
 
