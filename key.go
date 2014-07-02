@@ -6,13 +6,13 @@ import (
 )
 
 type Key struct {
-	datastore.Key
+	*datastore.Key
 }
 
 func unwrapKeys(keys []*Key) []*datastore.Key {
 	datastoreKeys := make([]*datastore.Key, len(keys))
 	for i, k := range keys {
-		datastoreKeys[i] = &k.Key
+		datastoreKeys[i] = k.Key
 	}
 	return datastoreKeys
 }
@@ -20,7 +20,7 @@ func unwrapKeys(keys []*Key) []*datastore.Key {
 func wrapKeys(keys []*datastore.Key) []*Key {
 	ndsKeys := make([]*Key, len(keys))
 	for i, k := range keys {
-		ndsKeys[i] = &Key{*k}
+		ndsKeys[i] = &Key{k}
 	}
 	return ndsKeys
 }
@@ -28,26 +28,26 @@ func wrapKeys(keys []*datastore.Key) []*Key {
 func NewIncompleteKey(c appengine.Context, kind string, parent *Key) *Key {
 	var parentKey *datastore.Key
 	if parent != nil {
-		parentKey = &parent.Key
+		parentKey = parent.Key
 	}
-	return &Key{*datastore.NewIncompleteKey(c, kind, parentKey)}
+	return &Key{datastore.NewIncompleteKey(c, kind, parentKey)}
 }
 
 func NewKey(c appengine.Context,
 	kind, stringID string, intID int64, parent *Key) *Key {
 	var parentKey *datastore.Key
 	if parent != nil {
-		parentKey = &parent.Key
+		parentKey = parent.Key
 	}
-	return &Key{*datastore.NewKey(c, kind, stringID, intID, parentKey)}
+	return &Key{datastore.NewKey(c, kind, stringID, intID, parentKey)}
 }
 
 func (k *Key) Parent() *Key {
-	return &Key{*k.Key.Parent()}
+	return &Key{k.Key.Parent()}
 }
 
 func (k *Key) Equal(o *Key) bool {
-	return k.Key.Equal(&o.Key)
+	return k.Key.Equal(o.Key)
 }
 
 func DecodeKey(encoded string) (*Key, error) {
@@ -55,7 +55,7 @@ func DecodeKey(encoded string) (*Key, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Key{*key}, err
+	return &Key{key}, err
 }
 
 func AllocateIDs(c appengine.Context,
@@ -63,7 +63,7 @@ func AllocateIDs(c appengine.Context,
 
 	var parentKey *datastore.Key
 	if parent != nil {
-		parentKey = &parent.Key
+		parentKey = parent.Key
 	}
 
 	return datastore.AllocateIDs(c, kind, parentKey, n)

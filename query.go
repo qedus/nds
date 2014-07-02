@@ -14,7 +14,7 @@ func NewQuery(kind string) *Query {
 }
 
 func (q *Query) Ancestor(ancestor *Key) *Query {
-	return &Query{q.Query.Ancestor(&ancestor.Key)}
+	return &Query{q.Query.Ancestor(ancestor.Key)}
 }
 
 func (q *Query) Filter(filter string, val interface{}) *Query {
@@ -77,7 +77,7 @@ func (q *Query) Run(c appengine.Context) *Iterator {
 
 func (i *Iterator) Next(val interface{}) (*Key, error) {
 	key, err := i.Iterator.Next(val)
-	return &Key{*key}, err
+	return &Key{key}, err
 }
 
 type Cursor struct {
