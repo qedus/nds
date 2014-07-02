@@ -20,7 +20,10 @@ func inTransaction(c appengine.Context) bool {
 func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	opts *TransactionOptions) error {
 
-	txOpts := &datastore.TransactionOptions{XG: opts.XG}
+	txOpts := &datastore.TransactionOptions{}
+	if opts != nil {
+		txOpts.XG = opts.XG
+	}
 
 	return datastore.RunInTransaction(c, func(tc appengine.Context) error {
 		txc := txContext{

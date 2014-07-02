@@ -59,12 +59,22 @@ func DecodeKey(encoded string) (*Key, error) {
 }
 
 func (k *Key) GobDecode(buf []byte) error {
-    key := &datastore.Key{}
-    if err := key.GobDecode(buf); err != nil {
-        return err
-    }
-    k.Key = key
-    return nil
+	key := &datastore.Key{}
+	if err := key.GobDecode(buf); err != nil {
+		return err
+	}
+	k.Key = key
+	return nil
+}
+
+func (k *Key) UnmarshalJSON(buf []byte) error {
+
+	key := &datastore.Key{}
+	if err := key.UnmarshalJSON(buf); err != nil {
+		return err
+	}
+	k.Key = key
+	return nil
 }
 
 func AllocateIDs(c appengine.Context,
