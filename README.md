@@ -1,5 +1,7 @@
 # nds
 
+[![Build Status](https://travis-ci.org/qedus/nds.svg?branch=master)](https://travis-ci.org/qedus/nds)
+
 Package `github.com/qedus/nds` is a datastore API for the Google App Engine (GAE) [Go Runtime Environment](https://developers.google.com/appengine/docs/go/) that uses memcache to cache all datastore requests. This package guarantees strong cache consistency, meaning you will never get data from a stale cache.
 
 Exposed parts of this API are similar to the official one distributed by Google ([`appengine/datastore`](https://developers.google.com/appengine/docs/go/datastore/reference)). However, underneath `github.com/qedus/nds` uses a caching stategy similar to the GAE [Python NDB API](https://developers.google.com/appengine/docs/python/ndb/). In fact the caching strategy used here even fixes one or two of the Python NDB [caching consistency bugs](http://goo.gl/3ByVlA).
