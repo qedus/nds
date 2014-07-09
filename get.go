@@ -123,7 +123,7 @@ func Get(c appengine.Context, key *Key, val interface{}) error {
 	return err
 }
 
-type cacheState int
+type cacheState byte
 
 const (
 	miss cacheState = iota
