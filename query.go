@@ -18,6 +18,9 @@ func (q *Query) Ancestor(ancestor *Key) *Query {
 }
 
 func (q *Query) Filter(filter string, val interface{}) *Query {
+	if key, ok := val.(*Key); ok {
+		val = key.Key
+	}
 	return &Query{q.Query.Filter(filter, val)}
 }
 
