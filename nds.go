@@ -24,6 +24,9 @@ var (
 	typeOfPropertyLoadSaver = reflect.TypeOf(
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
+
+	ErrInvalidKey   = datastore.ErrInvalidKey
+	ErrNoSuchEntity = datastore.ErrNoSuchEntity
 )
 
 const (
@@ -38,7 +41,7 @@ func itemLock() []byte {
 	return b
 }
 
-func checkArgs(key *datastore.Key, val interface{}) error {
+func checkArgs(key *Key, val interface{}) error {
 	if key == nil {
 		return errors.New("nds: key is nil")
 	}
@@ -61,7 +64,7 @@ func checkArgs(key *datastore.Key, val interface{}) error {
 
 }
 
-func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
+func checkMultiArgs(keys []*Key, v reflect.Value) error {
 	if v.Kind() != reflect.Slice {
 		return errors.New("nds: vals is not a slice")
 	}
@@ -93,6 +96,6 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	return errors.New("nds: unsupported vals type")
 }
 
-func createMemcacheKey(key *datastore.Key) string {
+func createMemcacheKey(key *Key) string {
 	return memcachePrefix + key.Encode()
 }

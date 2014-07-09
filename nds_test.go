@@ -3,7 +3,6 @@ package nds_test
 import (
 	"appengine"
 	"appengine/aetest"
-	"appengine/datastore"
 	"github.com/qedus/nds"
 	"strconv"
 	"testing"
@@ -20,7 +19,7 @@ func TestPutGetDelete(t *testing.T) {
 		Val int
 	}
 
-	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
+	incompleteKey := nds.NewIncompleteKey(c, "Entity", nil)
 	key, err := nds.Put(c, incompleteKey, &testEntity{43})
 	if err != nil {
 		t.Fatal(err)
@@ -68,8 +67,8 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := nds.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
-		t.Fatal("expected datastore.ErrNoSuchEntity")
+	if err := nds.Get(c, key, &testEntity{}); err != nds.ErrNoSuchEntity {
+		t.Fatal("expected nds.ErrNoSuchEntity")
 	}
 }
 
@@ -84,8 +83,8 @@ func TestInterfaces(t *testing.T) {
 		Val int
 	}
 
-	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
-	incompleteKeys := []*datastore.Key{incompleteKey}
+	incompleteKey := nds.NewIncompleteKey(c, "Entity", nil)
+	incompleteKeys := []*nds.Key{incompleteKey}
 	entities := []interface{}{&testEntity{43}}
 	keys, err := nds.PutMulti(c, incompleteKeys, entities)
 	if err != nil {
@@ -101,7 +100,7 @@ func TestInterfaces(t *testing.T) {
 
 	entities = []interface{}{&testEntity{}}
 	if err := nds.GetMulti(c, keys, entities); err != nil {
-		//if err := datastore.GetMulti(c, keys, entities); err != nil {
+		//if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
 
@@ -125,7 +124,7 @@ func TestInterfaces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get from datastore with struct.
+	// Get from nds with struct.
 	entities = []interface{}{&testEntity{}}
 	if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
@@ -146,11 +145,11 @@ func TestInterfaces(t *testing.T) {
 		if len(me) != 1 {
 			t.Fatal("expected 1 appengine.MultiError")
 		}
-		if me[0] != datastore.ErrNoSuchEntity {
-			t.Fatal("expected datastore.ErrNoSuchEntity")
+		if me[0] != nds.ErrNoSuchEntity {
+			t.Fatal("expected nds.ErrNoSuchEntity")
 		}
 	} else {
-		t.Fatal("expected datastore.ErrNoSuchEntity", err)
+		t.Fatal("expected nds.ErrNoSuchEntity", err)
 	}
 }
 
@@ -168,11 +167,11 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 	// Test no such entity.
 	for _, count := range []int{999, 1000, 1001} {
 
-		keys := []*datastore.Key{}
+		keys := []*nds.Key{}
 		entities := []*testEntity{}
 		for i := 0; i < count; i++ {
 			keys = append(keys,
-				datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
+				nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
 			entities = append(entities, &testEntity{})
 		}
 
@@ -182,8 +181,8 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 				t.Fatal("multi error length incorrect")
 			}
 			for _, e := range me {
-				if e != datastore.ErrNoSuchEntity {
-					t.Fatal("expecting datastore.ErrNoSuchEntity but got", e)
+				if e != nds.ErrNoSuchEntity {
+					t.Fatal("expecting nds.ErrNoSuchEntity but got", e)
 				}
 			}
 		}
@@ -204,10 +203,10 @@ func TestGetMultiNoErrors(t *testing.T) {
 	for _, count := range []int{999, 1000, 1001} {
 
 		// Create entities.
-		keys := []*datastore.Key{}
+		keys := []*nds.Key{}
 		entities := []*testEntity{}
 		for i := 0; i < count; i++ {
-			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+			key := nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
 			entities = append(entities, &testEntity{i})
 		}
@@ -250,16 +249,16 @@ func TestGetMultiErrorMix(t *testing.T) {
 	for _, count := range []int{999, 1000, 1001} {
 
 		// Create entities.
-		keys := []*datastore.Key{}
+		keys := []*nds.Key{}
 		entities := []testEntity{}
 		for i := 0; i < count; i++ {
-			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+			key := nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
 			entities = append(entities, testEntity{i})
 		}
 
 		// Save every other entity.
-		putKeys := []*datastore.Key{}
+		putKeys := []*nds.Key{}
 		putEntities := []testEntity{}
 		for i, key := range keys {
 			if i%2 == 0 {
@@ -292,7 +291,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 						entities[i].Val)
 				}
 			} else if me, ok := err.(appengine.MultiError); ok {
-				if me[i] != datastore.ErrNoSuchEntity {
+				if me[i] != nds.ErrNoSuchEntity {
 					t.Fatalf("incorrect error %+v, index %d, of %d",
 						me, i, count)
 				}
@@ -316,16 +315,16 @@ func TestMultiCache(t *testing.T) {
 	const entityCount = 88
 
 	// Create entities.
-	keys := []*datastore.Key{}
+	keys := []*nds.Key{}
 	entities := []testEntity{}
 	for i := 0; i < entityCount; i++ {
-		key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+		key := nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 		keys = append(keys, key)
 		entities = append(entities, testEntity{i})
 	}
 
 	// Save every other entity.
-	putKeys := []*datastore.Key{}
+	putKeys := []*nds.Key{}
 	putEntities := []testEntity{}
 	for i, key := range keys {
 		if i%2 == 0 {
@@ -339,7 +338,7 @@ func TestMultiCache(t *testing.T) {
 		t.Fatal("incorrect key len")
 	}
 
-	// Get from datastore.
+	// Get from nds.
 	respEntities := make([]testEntity, len(keys))
 	err = nds.GetMulti(c, keys, respEntities)
 	if err == nil {
@@ -365,7 +364,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != datastore.ErrNoSuchEntity {
+			if me[i] != nds.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -398,7 +397,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != datastore.ErrNoSuchEntity {
+			if me[i] != nds.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -431,7 +430,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != datastore.ErrNoSuchEntity {
+			if me[i] != nds.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -450,8 +449,8 @@ func TestRunInTransaction(t *testing.T) {
 		Val int
 	}
 
-	key := datastore.NewKey(c, "Entity", "", 3, nil)
-	keys := []*datastore.Key{key}
+	key := nds.NewKey(c, "Entity", "", 3, nil)
+	keys := []*nds.Key{key}
 	entity := testEntity{42}
 	entities := []testEntity{entity}
 

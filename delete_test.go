@@ -3,7 +3,6 @@ package nds_test
 import (
 	"appengine"
 	"appengine/aetest"
-	"appengine/datastore"
 	"github.com/qedus/nds"
 	"testing"
 )
@@ -19,8 +18,8 @@ func TestDelete(t *testing.T) {
 		Val int
 	}
 
-	key := datastore.NewKey(c, "Entity", "", 1, nil)
-	keys := []*datastore.Key{key}
+	key := nds.NewKey(c, "Entity", "", 1, nil)
+	keys := []*nds.Key{key}
 	entities := make([]testEntity, 1)
 	entities[0].Val = 43
 
@@ -41,11 +40,11 @@ func TestDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	keys = []*datastore.Key{key}
+	keys = []*nds.Key{key}
 	entities = make([]testEntity, 1)
 	err = nds.GetMulti(c, keys, entities)
 	if me, ok := err.(appengine.MultiError); ok {
-		if me[0] != datastore.ErrNoSuchEntity {
+		if me[0] != nds.ErrNoSuchEntity {
 			t.Fatal("entity should be deleted", entities)
 		}
 	} else {
