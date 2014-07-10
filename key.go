@@ -6,13 +6,13 @@ import (
 )
 
 type Key struct {
-	*datastore.Key
+	key *datastore.Key
 }
 
 func unwrapKeys(keys []*Key) []*datastore.Key {
 	datastoreKeys := make([]*datastore.Key, len(keys))
 	for i, k := range keys {
-		datastoreKeys[i] = k.Key
+		datastoreKeys[i] = k.key
 	}
 	return datastoreKeys
 }
@@ -28,7 +28,7 @@ func wrapKeys(keys []*datastore.Key) []*Key {
 func NewIncompleteKey(c appengine.Context, kind string, parent *Key) *Key {
 	var parentKey *datastore.Key
 	if parent != nil {
-		parentKey = parent.Key
+		parentKey = parent.key
 	}
 	return &Key{datastore.NewIncompleteKey(c, kind, parentKey)}
 }
@@ -37,17 +37,59 @@ func NewKey(c appengine.Context,
 	kind, stringID string, intID int64, parent *Key) *Key {
 	var parentKey *datastore.Key
 	if parent != nil {
-		parentKey = parent.Key
+		parentKey = parent.key
 	}
 	return &Key{datastore.NewKey(c, kind, stringID, intID, parentKey)}
 }
 
 func (k *Key) Parent() *Key {
-	return &Key{k.Key.Parent()}
+	return &Key{k.key.Parent()}
+}
+
+func (k *Key) AppID() string {
+	return k.key.AppID()
+}
+
+func (k *Key) Namespace() string {
+	return k.key.Namespace()
+}
+
+func (k *Key) Encode() string {
+	return k.key.Encode()
+}
+
+func (k *Key) GobDecode(buf []byte) error {
+	key := &datastore.Key{}
+	if err := key.GobDecode(buf); err != nil {
+		return err
+	}
+	k.key = key
+	return nil
+}
+
+func (k *Key) GobEncode() ([]byte, error) {
+	return k.key.GobEncode()
+}
+
+func (k *Key) MarshalJSON() ([]byte, error) {
+	return k.key.MarshalJSON()
+}
+
+func (k *Key) UnmarshalJSON(buf []byte) error {
+	key := &datastore.Key{}
+	if err := key.UnmarshalJSON(buf); err != nil {
+		return err
+	}
+	k.key = key
+	return nil
 }
 
 func (k *Key) Equal(o *Key) bool {
-	return k.Key.Equal(o.Key)
+	return k.key.Equal(o.key)
+}
+
+func (k *Key) Incomplete() bool {
+	return k.key.Incomplete()
 }
 
 func DecodeKey(encoded string) (*Key, error) {
@@ -58,23 +100,16 @@ func DecodeKey(encoded string) (*Key, error) {
 	return &Key{key}, err
 }
 
-func (k *Key) GobDecode(buf []byte) error {
-	key := &datastore.Key{}
-	if err := key.GobDecode(buf); err != nil {
-		return err
-	}
-	k.Key = key
-	return nil
+func (k *Key) IntID() int64 {
+	return k.key.IntID()
 }
 
-func (k *Key) UnmarshalJSON(buf []byte) error {
+func (k *Key) StringID() string {
+	return k.key.StringID()
+}
 
-	key := &datastore.Key{}
-	if err := key.UnmarshalJSON(buf); err != nil {
-		return err
-	}
-	k.Key = key
-	return nil
+func (k *Key) String() string {
+	return k.key.String()
 }
 
 func AllocateIDs(c appengine.Context,
@@ -82,7 +117,7 @@ func AllocateIDs(c appengine.Context,
 
 	var parentKey *datastore.Key
 	if parent != nil {
-		parentKey = parent.Key
+		parentKey = parent.key
 	}
 
 	return datastore.AllocateIDs(c, kind, parentKey, n)
