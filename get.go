@@ -160,22 +160,14 @@ func getMulti(c appengine.Context, keys []*Key, vals reflect.Value) error {
 		cacheItems[i].state = miss
 	}
 
-	if err := loadMemcache(c, cacheItems); err != nil {
-		return err
-	}
-
-	// Lock memcache while we get new data from the datastore.
-	if err := lockMemcache(c, cacheItems); err != nil {
-		return err
-	}
+	loadMemcache(c, cacheItems)
+	lockMemcache(c, cacheItems)
 
 	if err := loadDatastore(c, cacheItems, vals.Type()); err != nil {
 		return err
 	}
 
-	if err := saveMemcache(c, cacheItems); err != nil {
-		return err
-	}
+	saveMemcache(c, cacheItems)
 
 	me, errsNil := make(appengine.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {
@@ -191,7 +183,7 @@ func getMulti(c appengine.Context, keys []*Key, vals reflect.Value) error {
 	return me
 }
 
-func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
+func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	memcacheKeys := make([]string, len(cacheItems))
 	for i, cacheItem := range cacheItems {
@@ -203,8 +195,8 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 		for i := range cacheItems {
 			cacheItems[i].state = externalLock
 		}
-		c.Warningf("loadMemcache GetMulti %s", err)
-		return nil
+		c.Warningf("nds:loadMemcache GetMulti %s", err)
+		return
 	}
 
 	for i, memcacheKey := range memcacheKeys {
@@ -220,19 +212,18 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 				if err == nil {
 					cacheItems[i].state = done
 				} else {
-					c.Warningf("loadMemcache unmarshal %s", err)
+					c.Warningf("nds:loadMemcache unmarshal %s", err)
 					cacheItems[i].state = externalLock
 				}
 			default:
-				c.Warningf("loadMemcache unknown item.Flags %d", item.Flags)
+				c.Warningf("nds:loadMemcache unknown item.Flags %d", item.Flags)
 				cacheItems[i].state = externalLock
 			}
 		}
 	}
-	return nil
 }
 
-func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
+func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	lockItems := make([]*memcache.Item, 0, len(cacheItems))
 	lockMemcacheKeys := make([]string, 0, len(cacheItems))
@@ -253,7 +244,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 
 	// We don't care if there are errors here.
 	if err := memcache.AddMulti(c, lockItems); err != nil {
-		c.Warningf("lockMemcache AddMulti %s", err)
+		c.Warningf("nds:lockMemcache AddMulti %s", err)
 	}
 
 	// Get the items again so we can use CAS when updating the cache.
@@ -266,8 +257,8 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 				cacheItems[i].state = externalLock
 			}
 		}
-		c.Warningf("lockMemcache GetMulti %s", err)
-		return nil
+		c.Warningf("nds:lockMemcache GetMulti %s", err)
+		return
 	}
 
 	// Cache worked so figure out what items we got.
@@ -290,11 +281,12 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 					if err == nil {
 						cacheItems[i].state = done
 					} else {
-						c.Warningf("lockMemcache unmarshal %s", err)
+						c.Warningf("nds:lockMemcache unmarshal %s", err)
 						cacheItems[i].state = externalLock
 					}
 				default:
-					c.Warningf("lockMemcache unknown item.Flags %d", item.Flags)
+					c.Warningf("nds:lockMemcache unknown item.Flags %d",
+						item.Flags)
 					cacheItems[i].state = externalLock
 				}
 			} else {
@@ -304,8 +296,6 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func loadDatastore(c appengine.Context, cacheItems []cacheItem,
@@ -346,7 +336,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 					cacheItems[index].item.Value = data
 				} else {
 					cacheItems[index].state = externalLock
-					c.Warningf("loadDatastore marshal %s", err)
+					c.Warningf("nds:loadDatastore marshal %s", err)
 				}
 			}
 		case datastore.ErrNoSuchEntity:
@@ -364,7 +354,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	return nil
 }
 
-func saveMemcache(c appengine.Context, cacheItems []cacheItem) error {
+func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	saveItems := make([]*memcache.Item, 0, len(cacheItems))
 	for _, cacheItem := range cacheItems {
@@ -373,12 +363,9 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) error {
 		}
 	}
 
-	// This is conservative. We could filter out appengine.MultiError and only
-	// return other types of errors.
 	if err := memcache.CompareAndSwapMulti(c, saveItems); err != nil {
-		c.Warningf("saveMemcache CompareAndSwapMulti %s", err)
+		c.Warningf("nds:saveMemcache CompareAndSwapMulti %s", err)
 	}
-	return nil
 }
 
 func marshal(v reflect.Value) ([]byte, error) {
