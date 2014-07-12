@@ -43,7 +43,8 @@ const getMultiLimit = 1000
 //
 // vals currently only takes slices of structs. It does not take slices of
 // pointers, interfaces or datastore.PropertyLoadSaver.
-func GetMulti(c appengine.Context, keys []*Key, vals interface{}) error {
+func GetMulti(c appengine.Context,
+	keys []*datastore.Key, vals interface{}) error {
 
 	v := reflect.ValueOf(vals)
 	if err := checkMultiArgs(keys, v); err != nil {
@@ -73,7 +74,7 @@ func GetMulti(c appengine.Context, keys []*Key, vals interface{}) error {
 		go func() {
 			if inTransaction(c) {
 				errs[index] = datastore.GetMulti(c,
-					unwrapKeys(keySlice), valSlice.Interface())
+					keySlice, valSlice.Interface())
 			} else {
 				errs[index] = getMulti(c, keySlice, valSlice)
 			}
@@ -109,14 +110,14 @@ func GetMulti(c appengine.Context, keys []*Key, vals interface{}) error {
 	return groupedErrs
 }
 
-func Get(c appengine.Context, key *Key, val interface{}) error {
+func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 
 	if err := checkArgs(key, val); err != nil {
 		return err
 	}
 
 	vals := reflect.ValueOf([]interface{}{val})
-	err := getMulti(c, []*Key{key}, vals)
+	err := getMulti(c, []*datastore.Key{key}, vals)
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
 	}
@@ -133,7 +134,7 @@ const (
 )
 
 type cacheItem struct {
-	key         *Key
+	key         *datastore.Key
 	memcacheKey string
 
 	val reflect.Value
@@ -150,7 +151,8 @@ type cacheItem struct {
 // function, datastore or server fails at any point. The caching strategy is
 // borrowed from Python ndb with some improvements that eliminate some
 // consistency issues surrounding ndb, including http://goo.gl/3ByVlA.
-func getMulti(c appengine.Context, keys []*Key, vals reflect.Value) error {
+func getMulti(c appengine.Context,
+	keys []*datastore.Key, vals reflect.Value) error {
 
 	cacheItems := make([]cacheItem, len(keys))
 	for i, key := range keys {
@@ -301,7 +303,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	valsType reflect.Type) error {
 
-	keys := make([]*Key, 0, len(cacheItems))
+	keys := make([]*datastore.Key, 0, len(cacheItems))
 	vals := reflect.MakeSlice(valsType, 0, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
 
@@ -315,8 +317,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	}
 
 	var me appengine.MultiError
-	if err := datastore.GetMulti(c, unwrapKeys(keys),
-		vals.Interface()); err == nil {
+	if err := datastore.GetMulti(c, keys, vals.Interface()); err == nil {
 		me = make(appengine.MultiError, len(keys))
 	} else if e, ok := err.(appengine.MultiError); ok {
 		me = e

@@ -3,6 +3,7 @@ package nds_test
 import (
 	"appengine"
 	"appengine/aetest"
+	"appengine/datastore"
 	"github.com/qedus/nds"
 	"strconv"
 	"testing"
@@ -14,12 +15,12 @@ type queryTestEntity struct {
 }
 
 func addQueryTestEntities(c appengine.Context,
-	ancestorKey *nds.Key) ([]*nds.Key, error) {
+	ancestorKey *datastore.Key) ([]*datastore.Key, error) {
 
-	keys := []*nds.Key{}
+	keys := []*datastore.Key{}
 	entities := []queryTestEntity{}
 	for i := 1; i < 6; i++ {
-		keys = append(keys, nds.NewKey(c, "Entity", "", int64(i), ancestorKey))
+		keys = append(keys, datastore.NewKey(c, "Entity", "", int64(i), ancestorKey))
 		entities = append(entities, queryTestEntity{int64(i), strconv.Itoa(i)})
 	}
 
@@ -126,7 +127,7 @@ func TestAncestorQuery(t *testing.T) {
 	}
 	defer c.Close()
 
-	ancestorKey := nds.NewKey(c, "Ancestor", "parent", 0, nil)
+	ancestorKey := datastore.NewKey(c, "Ancestor", "parent", 0, nil)
 	keys, err := addQueryTestEntities(c, ancestorKey)
 	if err != nil {
 		t.Fatal(err)
@@ -250,7 +251,7 @@ func TestFilterQuery(t *testing.T) {
 	}
 
 	q = nds.NewQuery("Entity")
-	q = q.Filter("__key__ <", nds.NewKey(c, "Entity", "", 3, nil))
+	q = q.Filter("__key__ <", datastore.NewKey(c, "Entity", "", 3, nil))
 
 	vals = []queryTestEntity{}
 
@@ -390,7 +391,7 @@ func TestProjectQuery(t *testing.T) {
 	}
 
 	// Test distinct.
-	key := nds.NewKey(c, "Entity", "", 6, nil)
+	key := datastore.NewKey(c, "Entity", "", 6, nil)
 	if _, err := nds.Put(c, key, &queryTestEntity{5, "5"}); err != nil {
 		t.Fatal(err)
 	}

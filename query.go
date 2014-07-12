@@ -21,8 +21,8 @@ func NewQuery(kind string) *Query {
 
 // Ancestor returns a derivative query with an ancestor filter.
 // The ancestor should not be nil.
-func (q *Query) Ancestor(ancestor *Key) *Query {
-	return &Query{q.query.Ancestor(ancestor.key)}
+func (q *Query) Ancestor(ancestor *datastore.Key) *Query {
+	return &Query{q.query.Ancestor(ancestor)}
 }
 
 // Filter returns a derivative query with a field-based filter.
@@ -31,9 +31,6 @@ func (q *Query) Ancestor(ancestor *Key) *Query {
 // Fields are compared against the provided value using the operator.
 // Multiple filters are AND'ed together.
 func (q *Query) Filter(filter string, val interface{}) *Query {
-	if key, ok := val.(*Key); ok {
-		val = key.key
-	}
 	return &Query{q.query.Filter(filter, val)}
 }
 
@@ -108,12 +105,9 @@ func (q *Query) Count(c appengine.Context) (int, error) {
 // added to vals.
 //
 // If q is a ``keys-only'' query, GetAll ignores vals and only returns the keys.
-func (q *Query) GetAll(c appengine.Context, vals interface{}) ([]*Key, error) {
-	keys, err := q.query.GetAll(c, vals)
-	if err != nil {
-		return nil, err
-	}
-	return wrapKeys(keys), nil
+func (q *Query) GetAll(c appengine.Context,
+	vals interface{}) ([]*datastore.Key, error) {
+	return q.query.GetAll(c, vals)
 }
 
 // Iterator is the result of running a query.
@@ -131,9 +125,8 @@ func (q *Query) Run(c appengine.Context) *Iterator {
 
 // Next returns the key of the next result. When there are no more results,
 // Done is returned as the error.
-func (i *Iterator) Next(val interface{}) (*Key, error) {
-	key, err := i.Iterator.Next(val)
-	return &Key{key}, err
+func (i *Iterator) Next(val interface{}) (*datastore.Key, error) {
+	return i.Iterator.Next(val)
 }
 
 // Cursor is an iterator's position. It can be converted to and from an opaque

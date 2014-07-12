@@ -3,6 +3,7 @@ package nds_test
 import (
 	"appengine"
 	"appengine/aetest"
+	"appengine/datastore"
 	"github.com/qedus/nds"
 	"strconv"
 	"testing"
@@ -19,7 +20,7 @@ func TestPutGetDelete(t *testing.T) {
 		Val int
 	}
 
-	incompleteKey := nds.NewIncompleteKey(c, "Entity", nil)
+	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
 	key, err := nds.Put(c, incompleteKey, &testEntity{43})
 	if err != nil {
 		t.Fatal(err)
@@ -83,8 +84,8 @@ func TestInterfaces(t *testing.T) {
 		Val int
 	}
 
-	incompleteKey := nds.NewIncompleteKey(c, "Entity", nil)
-	incompleteKeys := []*nds.Key{incompleteKey}
+	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
+	incompleteKeys := []*datastore.Key{incompleteKey}
 	entities := []interface{}{&testEntity{43}}
 	keys, err := nds.PutMulti(c, incompleteKeys, entities)
 	if err != nil {
@@ -167,11 +168,11 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 	// Test no such entity.
 	for _, count := range []int{999, 1000, 1001} {
 
-		keys := []*nds.Key{}
+		keys := []*datastore.Key{}
 		entities := []*testEntity{}
 		for i := 0; i < count; i++ {
 			keys = append(keys,
-				nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
+				datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
 			entities = append(entities, &testEntity{})
 		}
 
@@ -203,10 +204,10 @@ func TestGetMultiNoErrors(t *testing.T) {
 	for _, count := range []int{999, 1000, 1001} {
 
 		// Create entities.
-		keys := []*nds.Key{}
+		keys := []*datastore.Key{}
 		entities := []*testEntity{}
 		for i := 0; i < count; i++ {
-			key := nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
 			entities = append(entities, &testEntity{i})
 		}
@@ -249,16 +250,16 @@ func TestGetMultiErrorMix(t *testing.T) {
 	for _, count := range []int{999, 1000, 1001} {
 
 		// Create entities.
-		keys := []*nds.Key{}
+		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := 0; i < count; i++ {
-			key := nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 			keys = append(keys, key)
 			entities = append(entities, testEntity{i})
 		}
 
 		// Save every other entity.
-		putKeys := []*nds.Key{}
+		putKeys := []*datastore.Key{}
 		putEntities := []testEntity{}
 		for i, key := range keys {
 			if i%2 == 0 {
@@ -315,16 +316,16 @@ func TestMultiCache(t *testing.T) {
 	const entityCount = 88
 
 	// Create entities.
-	keys := []*nds.Key{}
+	keys := []*datastore.Key{}
 	entities := []testEntity{}
 	for i := 0; i < entityCount; i++ {
-		key := nds.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+		key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
 		keys = append(keys, key)
 		entities = append(entities, testEntity{i})
 	}
 
 	// Save every other entity.
-	putKeys := []*nds.Key{}
+	putKeys := []*datastore.Key{}
 	putEntities := []testEntity{}
 	for i, key := range keys {
 		if i%2 == 0 {
@@ -449,8 +450,8 @@ func TestRunInTransaction(t *testing.T) {
 		Val int
 	}
 
-	key := nds.NewKey(c, "Entity", "", 3, nil)
-	keys := []*nds.Key{key}
+	key := datastore.NewKey(c, "Entity", "", 3, nil)
+	keys := []*datastore.Key{key}
 	entity := testEntity{42}
 	entities := []testEntity{entity}
 

@@ -15,7 +15,7 @@ const putMultiLimit = 500
 // appropriately with NDS's caching strategy.
 // vals can only be slices of structs, []S.
 func PutMulti(c appengine.Context,
-	keys []*Key, vals interface{}) ([]*Key, error) {
+	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
 	if err := checkMultiArgs(keys, reflect.ValueOf(vals)); err != nil {
 		return nil, err
@@ -24,13 +24,14 @@ func PutMulti(c appengine.Context,
 	return putMulti(c, keys, vals)
 }
 
-func Put(c appengine.Context, key *Key, val interface{}) (*Key, error) {
+func Put(c appengine.Context,
+	key *datastore.Key, val interface{}) (*datastore.Key, error) {
 
 	if err := checkArgs(key, val); err != nil {
 		return nil, err
 	}
 
-	keys, err := putMulti(c, []*Key{key}, []interface{}{val})
+	keys, err := putMulti(c, []*datastore.Key{key}, []interface{}{val})
 	if me, ok := err.(appengine.MultiError); ok {
 		return nil, me[0]
 	} else if err != nil {
@@ -41,7 +42,7 @@ func Put(c appengine.Context, key *Key, val interface{}) (*Key, error) {
 
 // putMulti puts the entities into the datastore and then its local cache.
 func putMulti(c appengine.Context,
-	keys []*Key, vals interface{}) ([]*Key, error) {
+	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 
 	lockMemcacheKeys := make([]string, 0, len(keys))
 	lockMemcacheItems := make([]*memcache.Item, 0, len(keys))
@@ -63,7 +64,7 @@ func putMulti(c appengine.Context,
 	}
 
 	// Save to the datastore.
-	dsKeys, err := datastore.PutMulti(c, unwrapKeys(keys), vals)
+	dsKeys, err := datastore.PutMulti(c, keys, vals)
 	if err != nil {
 		return nil, err
 	}
@@ -74,5 +75,5 @@ func putMulti(c appengine.Context,
 			c.Warningf("putMulti memcache.DeleteMulti %s", err)
 		}
 	}
-	return wrapKeys(dsKeys), nil
+	return dsKeys, nil
 }
