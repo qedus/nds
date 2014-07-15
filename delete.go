@@ -1,10 +1,11 @@
 package nds
 
 import (
+	"errors"
+
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
-	"errors"
 )
 
 // DeleteMulti works just like datastore.DeleteMulti except it maintains

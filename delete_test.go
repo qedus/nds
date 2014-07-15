@@ -1,11 +1,13 @@
 package nds_test
 
 import (
+	"testing"
+
+	"github.com/qedus/nds"
+
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
-	"github.com/qedus/nds"
-	"testing"
 )
 
 func TestDelete(t *testing.T) {
@@ -50,5 +52,17 @@ func TestDelete(t *testing.T) {
 		}
 	} else {
 		t.Fatal("expected appengine.MultiError")
+	}
+}
+
+func TestDeleteNilKey(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if err := nds.Delete(c, nil); err == nil {
+		t.Fatal("expected nil key error")
 	}
 }

@@ -1,12 +1,13 @@
 package nds
 
 import (
-	"appengine/datastore"
 	"encoding/binary"
 	"errors"
 	"math/rand"
 	"reflect"
 	"time"
+
+	"appengine/datastore"
 )
 
 const (

@@ -1,12 +1,14 @@
 package nds_test
 
 import (
+	"strconv"
+	"testing"
+
+	"github.com/qedus/nds"
+
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
-	"github.com/qedus/nds"
-	"strconv"
-	"testing"
 )
 
 func TestPutGetDelete(t *testing.T) {
