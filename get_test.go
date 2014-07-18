@@ -1,6 +1,7 @@
 package nds_test
 
 import (
+	"io"
 	"testing"
 
 	"github.com/qedus/nds"
@@ -251,5 +252,90 @@ func TestGetMultiInterfaceError(t *testing.T) {
 	response = []interface{}{&testEntity{}, testEntity{}}
 	if err := datastore.GetMulti(c, keys, response); err == nil {
 		t.Fatal("expected invalid entity type error")
+	}
+}
+
+// This is just used to ensure interfaces don't currently work.
+type readerTestEntity struct {
+	IntVal int
+}
+
+func (rte readerTestEntity) Read(p []byte) (n int, err error) {
+	return 1, nil
+}
+
+var _ io.Reader = readerTestEntity{}
+
+func newReaderTestEntity() io.Reader {
+	return readerTestEntity{}
+}
+
+func TestGetArgs(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	if err := nds.Get(c, nil, &testEntity{}); err == nil {
+		t.Fatal("expected error for nil key")
+	}
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	if err := nds.Get(c, key, nil); err == nil {
+		t.Fatal("expected error for nil value")
+	}
+
+	if err := nds.Get(c, key, datastore.PropertyList{}); err == nil {
+		t.Fatal("expected error for datastore.PropertyList")
+	}
+
+	if err := nds.Get(c, key, testEntity{}); err == nil {
+		t.Fatal("expected error for struct")
+	}
+
+	rte := newReaderTestEntity()
+	if err := nds.Get(c, key, rte); err == nil {
+		t.Fatal("expected error for interface")
+	}
+}
+
+func TestGetMultiArgs(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	keys := []*datastore.Key{key}
+	val := testEntity{}
+	if err := nds.GetMulti(c, keys, nil); err == nil {
+		t.Fatal("expected error for nil vals")
+	}
+	structVals := []testEntity{val}
+	if err := nds.GetMulti(c, nil, structVals); err == nil {
+		t.Fatal("expected error for nil keys")
+	}
+
+	if err := nds.GetMulti(c, keys, []testEntity{}); err == nil {
+		t.Fatal("expected error for unequal keys and vals")
+	}
+
+	if err := nds.GetMulti(c, keys, datastore.PropertyList{}); err == nil {
+		t.Fatal("expected error for propertyList")
+	}
+
+	rte := newReaderTestEntity()
+	if err := nds.GetMulti(c, keys, []io.Reader{rte}); err == nil {
+		t.Fatal("expected error for interface")
 	}
 }

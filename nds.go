@@ -86,8 +86,6 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	switch elemType.Kind() {
 	case reflect.Struct:
 		return nil
-	case reflect.Interface:
-		return nil
 	case reflect.Ptr:
 		elemType = elemType.Elem()
 		if elemType.Kind() == reflect.Struct {
