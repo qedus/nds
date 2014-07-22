@@ -57,7 +57,7 @@ func checkArgs(key *datastore.Key, val interface{}) error {
 	}
 
 	switch v.Kind() {
-	case reflect.Slice, reflect.Ptr:
+	case reflect.Ptr:
 		return nil
 	default:
 		return errors.New("nds: val must be a slice or pointer")
