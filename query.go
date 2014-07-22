@@ -147,7 +147,7 @@ func (i *Iterator) Cursor() (Cursor, error) {
 	return Cursor{cursor}, err
 }
 
-// Decode decodes a cursor from its base-64 string representation.
+// DecodeCursor decodes a cursor from its base-64 string representation.
 func DecodeCursor(s string) (Cursor, error) {
 	cursor, err := datastore.DecodeCursor(s)
 	return Cursor{cursor}, err

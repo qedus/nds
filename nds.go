@@ -26,7 +26,10 @@ var (
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
 
-	ErrInvalidKey   = datastore.ErrInvalidKey
+	// ErrInvalidKey is returned when an invalid key is presented.
+	ErrInvalidKey = datastore.ErrInvalidKey
+
+	// ErrNoSuchEntity is returned when no entity was found for a given key.
 	ErrNoSuchEntity = datastore.ErrNoSuchEntity
 )
 

@@ -33,6 +33,7 @@ func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	}, txOpts)
 }
 
+// TransactionOptions are the options for running a transaction.
 type TransactionOptions struct {
 	XG bool
 }

@@ -111,6 +111,18 @@ func GetMulti(c appengine.Context,
 	return groupedErrs
 }
 
+// Get loads the entity stored for key into val, which must be a struct pointer.
+// Currently PropertyLoadSaver is not implemented. If there is no such entity
+// for the key, Get returns ErrNoSuchEntity.
+//
+// The values of val's unmatched struct fields are not modified, and matching
+// slice-typed fields are not reset before appending to them. In particular, it
+// is recommended to pass a pointer to a zero valued struct on each Get call.
+//
+// ErrFieldMismatch is returned when a field is to be loaded into a different
+// type than the one it was stored from, or when a field is missing or
+// unexported in the destination struct. ErrFieldMismatch is only returned if
+// val is a struct pointer.
 func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 
 	if err := checkArgs(key, val); err != nil {

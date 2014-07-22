@@ -14,6 +14,7 @@ func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	return deleteMulti(c, keys)
 }
 
+// Delete deletes the entity for the given key.
 func Delete(c appengine.Context, key *datastore.Key) error {
 	if key == nil {
 		return errors.New("nds: key is nil")
