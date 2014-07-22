@@ -2,6 +2,7 @@ package nds_test
 
 import (
 	"io"
+	"reflect"
 	"testing"
 
 	"github.com/qedus/nds"
@@ -337,5 +338,45 @@ func TestGetMultiArgs(t *testing.T) {
 	rte := newReaderTestEntity()
 	if err := nds.GetMulti(c, keys, []io.Reader{rte}); err == nil {
 		t.Fatal("expected error for interface")
+	}
+}
+
+func TestGetSliceProperty(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVals []int64
+	}
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	intVals := []int64{0, 1, 2, 3}
+	val := &testEntity{intVals}
+
+	if _, err := datastore.Put(c, key, val); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get from datastore.
+	newVal := &testEntity{}
+	if err := nds.Get(c, key, newVal); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(val.IntVals, intVals) {
+		t.Fatal("slice properties not equal", val.IntVals)
+	}
+
+	// Get from memcache.
+	newVal = &testEntity{}
+	if err := nds.Get(c, key, newVal); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(val.IntVals, intVals) {
+		t.Fatal("slice properties not equal", val.IntVals)
 	}
 }
