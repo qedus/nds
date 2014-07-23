@@ -507,7 +507,7 @@ func TestNoPropertyList(t *testing.T) {
 	defer c.Close()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
-	pl := datastore.PropertyList{}
+	pl := datastore.PropertyList{datastore.Property{}}
 
 	if err := nds.GetMulti(c, keys, pl); err == nil {
 		t.Fatal("expecting no PropertyList error")
