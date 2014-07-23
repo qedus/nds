@@ -62,7 +62,19 @@ func TestDeleteNilKey(t *testing.T) {
 	}
 	defer c.Close()
 
-	if err := nds.Delete(c, nil); err == nil {
+	if err := nds.Delete(c, nil); err != nds.ErrInvalidKey {
 		t.Fatal("expected nil key error")
+	}
+}
+
+func TestDeleteIncompleteKey(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if err := nds.Delete(c, nil); err != nds.ErrInvalidKey {
+		t.Fatal("expected invalid key error")
 	}
 }

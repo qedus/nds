@@ -1,8 +1,6 @@
 package nds
 
 import (
-	"errors"
-
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
@@ -16,10 +14,6 @@ func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
 
 // Delete deletes the entity for the given key.
 func Delete(c appengine.Context, key *datastore.Key) error {
-	if key == nil {
-		return errors.New("nds: key is nil")
-	}
-
 	err := deleteMulti(c, []*datastore.Key{key})
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
@@ -28,12 +22,13 @@ func Delete(c appengine.Context, key *datastore.Key) error {
 }
 
 func deleteMulti(c appengine.Context, keys []*datastore.Key) error {
-	// TODO: ensure valid keys.
 
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {
-		if key.Incomplete() {
-			return ErrInvalidKey
+		// Worst case scenario is that we lock the entity for memcacheLockTime.
+		// datastore.Delete will raise the appropriate error.
+		if key == nil || key.Incomplete() {
+			continue
 		}
 
 		item := &memcache.Item{
