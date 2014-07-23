@@ -498,18 +498,3 @@ func TestRunInTransaction(t *testing.T) {
 		t.Fatalf("entity.Val != 43: %d", entity.Val)
 	}
 }
-
-func TestNoPropertyList(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
-	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
-	pl := datastore.PropertyList{datastore.Property{}}
-
-	if err := nds.GetMulti(c, keys, pl); err == nil {
-		t.Fatal("expecting no PropertyList error")
-	}
-}
