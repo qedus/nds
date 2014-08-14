@@ -124,6 +124,6 @@ func TestPutDatastoreMultiError(t *testing.T) {
 	if _, err := nds.Put(c, key, val); err == nil {
 		t.Fatal("expected error")
 	} else if err != expectedErr {
-        t.Fatal("should be expectedErr")
+		t.Fatal("should be expectedErr")
 	}
 }

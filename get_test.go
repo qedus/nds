@@ -7,8 +7,12 @@ import (
 
 	"github.com/qedus/nds"
 
+	"errors"
+
+	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
+	"appengine/memcache"
 )
 
 func TestGetMultiStruct(t *testing.T) {
@@ -408,5 +412,51 @@ func TestGetMultiNonStruct(t *testing.T) {
 
 	if err := nds.GetMulti(c, keys, vals); err == nil {
 		t.Fatal("expecting unsupported vals type")
+	}
+}
+
+// TestGetMemcacheFail makes sure that memcache failure does not stop Get from
+// working.
+func TestGetMemcacheFail(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	val := &testEntity{3}
+
+	if _, err := nds.Put(c, key, val); err != nil {
+		t.Fatal(err)
+	}
+
+	nds.SetMemcacheAddMulti(func(c appengine.Context,
+		items []*memcache.Item) error {
+		return errors.New("expected memcache.AddMulti error")
+	})
+	nds.SetMemcacheCompareAndSwapMulti(func(c appengine.Context,
+		items []*memcache.Item) error {
+		return errors.New("expected memcache.ComapreAndSwap error")
+	})
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		return nil, errors.New("expected memcache.GetMulti error")
+	})
+	nds.SetMemcacheSetMulti(func(c appengine.Context,
+		items []*memcache.Item) error {
+		return errors.New("expected memcache.SetMulti error")
+	})
+
+	retVal := &testEntity{}
+	if err := nds.Get(c, key, retVal); err != nil {
+		t.Fatal(err)
+	}
+	if val.IntVal != retVal.IntVal {
+		t.Fatal("val and retVal not equal")
 	}
 }

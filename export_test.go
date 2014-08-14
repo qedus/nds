@@ -6,8 +6,21 @@ import (
 	"appengine/memcache"
 )
 
+func SetMemcacheAddMulti(f func(c appengine.Context,
+	items []*memcache.Item) error) {
+	memcacheAddMulti = f
+}
+func SetMemcacheCompareAndSwapMulti(f func(c appengine.Context,
+	items []*memcache.Item) error) {
+	memcacheCompareAndSwapMulti = f
+}
 func SetMemcacheDeleteMulti(f func(c appengine.Context, keys []string) error) {
 	memcacheDeleteMulti = f
+}
+
+func SetMemcacheGetMulti(f func(c appengine.Context,
+	keys []string) (map[string]*memcache.Item, error)) {
+	memcacheGetMulti = f
 }
 
 func SetMemcacheSetMulti(f func(c appengine.Context,

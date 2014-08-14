@@ -74,7 +74,7 @@ func GetMulti(c appengine.Context,
 
 		go func() {
 			if inTransaction(c) {
-				errs[index] = datastore.GetMulti(c,
+				errs[index] = datastoreGetMulti(c,
 					keySlice, valSlice.Interface())
 			} else {
 				errs[index] = getMulti(c, keySlice, valSlice)
@@ -206,7 +206,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 		memcacheKeys[i] = cacheItem.memcacheKey
 	}
 
-	items, err := memcache.GetMulti(c, memcacheKeys)
+	items, err := memcacheGetMulti(c, memcacheKeys)
 	if err != nil {
 		for i := range cacheItems {
 			cacheItems[i].state = externalLock
@@ -259,12 +259,12 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 	}
 
 	// We don't care if there are errors here.
-	if err := memcache.AddMulti(c, lockItems); err != nil {
+	if err := memcacheAddMulti(c, lockItems); err != nil {
 		c.Warningf("nds:lockMemcache AddMulti %s", err)
 	}
 
 	// Get the items again so we can use CAS when updating the cache.
-	items, err := memcache.GetMulti(c, lockMemcacheKeys)
+	items, err := memcacheGetMulti(c, lockMemcacheKeys)
 
 	// Cache failed so forget about it and just use the datastore.
 	if err != nil {
@@ -331,7 +331,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	}
 
 	var me appengine.MultiError
-	if err := datastore.GetMulti(c, keys, vals.Interface()); err == nil {
+	if err := datastoreGetMulti(c, keys, vals.Interface()); err == nil {
 		me = make(appengine.MultiError, len(keys))
 	} else if e, ok := err.(appengine.MultiError); ok {
 		me = e
@@ -378,7 +378,7 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
 		}
 	}
 
-	if err := memcache.CompareAndSwapMulti(c, saveItems); err != nil {
+	if err := memcacheCompareAndSwapMulti(c, saveItems); err != nil {
 		c.Warningf("nds:saveMemcache CompareAndSwapMulti %s", err)
 	}
 }
