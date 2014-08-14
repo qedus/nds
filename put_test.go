@@ -119,11 +119,11 @@ func TestPutDatastoreMultiError(t *testing.T) {
 	}()
 
 	key := datastore.NewKey(c, "Test", "", 1, nil)
-	val := testEntity{42}
+	val := &testEntity{42}
 
 	if _, err := nds.Put(c, key, val); err == nil {
 		t.Fatal("expected error")
-	} else if _, ok := err.(appengine.MultiError); ok {
-		t.Fatal("should not be a MultiError")
+	} else if err != expectedErr {
+        t.Fatal("should be expectedErr")
 	}
 }
