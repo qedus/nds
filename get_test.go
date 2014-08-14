@@ -452,6 +452,13 @@ func TestGetMemcacheFail(t *testing.T) {
 		return errors.New("expected memcache.SetMulti error")
 	})
 
+	defer func() {
+		nds.SetMemcacheAddMulti(memcache.AddMulti)
+		nds.SetMemcacheCompareAndSwapMulti(memcache.CompareAndSwapMulti)
+		nds.SetMemcacheGetMulti(memcache.GetMulti)
+		nds.SetMemcacheSetMulti(memcache.SetMulti)
+	}()
+
 	retVal := &testEntity{}
 	if err := nds.Get(c, key, retVal); err != nil {
 		t.Fatal(err)
