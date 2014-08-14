@@ -5,9 +5,12 @@ import (
 
 	"github.com/qedus/nds"
 
+	"errors"
+
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
+	"appengine/memcache"
 )
 
 func TestDelete(t *testing.T) {
@@ -76,5 +79,39 @@ func TestDeleteIncompleteKey(t *testing.T) {
 
 	if err := nds.Delete(c, nil); err != nds.ErrInvalidKey {
 		t.Fatal("expected invalid key error")
+	}
+}
+
+func TestDeleteMemcacheFail(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		Val int
+	}
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	keys := []*datastore.Key{key}
+	entities := make([]testEntity, 1)
+	entities[0].Val = 43
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	nds.SetMemcacheSetMulti(func(c appengine.Context,
+		items []*memcache.Item) error {
+		return errors.New("expected error")
+	})
+
+	defer func() {
+		nds.SetMemcacheSetMulti(memcache.SetMulti)
+	}()
+
+	if err := nds.DeleteMulti(c, keys); err == nil {
+		t.Fatal("expected DeleteMulti error")
 	}
 }

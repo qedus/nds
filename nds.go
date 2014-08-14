@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"time"
 
+	"appengine/memcache"
+
 	"appengine/datastore"
 )
 
@@ -25,6 +27,16 @@ var (
 	typeOfPropertyLoadSaver = reflect.TypeOf(
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
+
+	memcacheAddMulti            = memcache.AddMulti
+	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
+	memcacheGetMulti            = memcache.GetMulti
+	memcacheDeleteMulti         = memcache.DeleteMulti
+	memcacheSetMulti            = memcache.SetMulti
+
+	datastoreDeleteMulti = datastore.DeleteMulti
+	datastoreGetMulti    = datastore.GetMulti
+	datastorePutMulti    = datastore.PutMulti
 
 	// ErrInvalidKey is returned when an invalid key is presented.
 	ErrInvalidKey = datastore.ErrInvalidKey
