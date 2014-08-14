@@ -467,3 +467,40 @@ func TestGetMemcacheFail(t *testing.T) {
 		t.Fatal("val and retVal not equal")
 	}
 }
+
+func TestGetMultiDatastoreFail(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	nds.SetDatastoreGetMulti(func(c appengine.Context,
+		keys []*datastore.Key, vals interface{}) error {
+		return errors.New("expected datastore.GetMulti error")
+	})
+	defer func() {
+		nds.SetDatastoreGetMulti(datastore.GetMulti)
+	}()
+
+	// Get from datastore.
+	response := make([]testEntity, len(keys))
+	if err := datastore.GetMulti(c, keys, response); err == nil {
+		t.Fatal("expected GetMulti to fail")
+	}
+}

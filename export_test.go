@@ -32,3 +32,8 @@ func SetDatastorePutMulti(f func(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error)) {
 	datastorePutMulti = f
 }
+
+func SetDatastoreGetMulti(f func(c appengine.Context,
+	keys []*datastore.Key, vals interface{}) error) {
+	datastoreGetMulti = f
+}
