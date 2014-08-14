@@ -69,7 +69,7 @@ func putMulti(c appengine.Context,
 	}
 
 	// Save to the datastore.
-	dsKeys, err := datastore.PutMulti(c, keys, vals)
+	dsKeys, err := datastorePutMulti(c, keys, vals)
 	if err != nil {
 		return nil, err
 	}

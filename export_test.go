@@ -2,19 +2,8 @@ package nds
 
 import (
 	"appengine"
+	"appengine/datastore"
 	"appengine/memcache"
-)
-
-var (
-	MemcacheAddMulti            = memcacheAddMulti
-	MemcacheCompareAndSwapMulti = memcacheCompareAndSwapMulti
-	MemcacheDeleteMulti         = memcacheDeleteMulti
-	MemcacheGetMulti            = memcacheGetMulti
-	MemcacheSetMulti            = memcacheSetMulti
-
-	DatastoreGetMulti    = datastoreGetMulti
-	DatastoreDeleteMulti = datastoreDeleteMulti
-	DatastorePutMulti    = datastorePutMulti
 )
 
 func SetMemcacheDeleteMulti(f func(c appengine.Context, keys []string) error) {
@@ -24,4 +13,9 @@ func SetMemcacheDeleteMulti(f func(c appengine.Context, keys []string) error) {
 func SetMemcacheSetMulti(f func(c appengine.Context,
 	items []*memcache.Item) error) {
 	memcacheSetMulti = f
+}
+
+func SetDatastorePutMulti(f func(c appengine.Context,
+	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error)) {
+	datastorePutMulti = f
 }

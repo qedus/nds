@@ -95,3 +95,35 @@ func TestPutMultiUnlockMemcacheSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPutDatastoreMultiError(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int
+	}
+
+	expectedErr := errors.New("expected error")
+
+	nds.SetDatastorePutMulti(func(c appengine.Context,
+		keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
+		return nil, appengine.MultiError{expectedErr}
+	})
+
+	defer func() {
+		nds.SetDatastorePutMulti(datastore.PutMulti)
+	}()
+
+	key := datastore.NewKey(c, "Test", "", 1, nil)
+	val := testEntity{42}
+
+	if _, err := nds.Put(c, key, val); err == nil {
+		t.Fatal("expected error")
+	} else if _, ok := err.(appengine.MultiError); ok {
+		t.Fatal("should not be a MultiError")
+	}
+}
