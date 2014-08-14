@@ -500,7 +500,7 @@ func TestGetMultiDatastoreFail(t *testing.T) {
 
 	// Get from datastore.
 	response := make([]testEntity, len(keys))
-	if err := datastore.GetMulti(c, keys, response); err == nil {
+	if err := nds.GetMulti(c, keys, response); err == nil {
 		t.Fatal("expected GetMulti to fail")
 	}
 }
