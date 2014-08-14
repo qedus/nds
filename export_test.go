@@ -17,6 +17,10 @@ var (
 	DatastorePutMulti    = datastorePutMulti
 )
 
+func SetMemcacheDeleteMulti(f func(c appengine.Context, keys []string) error) {
+	memcacheDeleteMulti = f
+}
+
 func SetMemcacheSetMulti(f func(c appengine.Context,
 	items []*memcache.Item) error) {
 	memcacheSetMulti = f
