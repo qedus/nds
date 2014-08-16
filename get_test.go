@@ -504,3 +504,58 @@ func TestGetMultiDatastoreFail(t *testing.T) {
 		t.Fatal("expected GetMulti to fail")
 	}
 }
+
+func TestGetMultiMemcacheCorrupt(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Charge memcache.
+	if err := nds.GetMulti(c, keys, make([]testEntity, len(keys))); err != nil {
+		t.Fatal(err)
+	}
+
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		items, err := memcache.GetMulti(c, keys)
+
+		// Skip over lockMemcaheKeys GetMulti.
+		if len(keys) != 0 {
+			// Corrupt second item.
+			items[keys[1]].Value = []byte("corrupt string")
+		}
+
+		return items, err
+	})
+	defer func() {
+		nds.SetMemcacheGetMulti(memcache.GetMulti)
+	}()
+
+	// Get from datastore.
+	response := make([]testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < len(keys); i++ {
+		if entities[i].IntVal != response[i].IntVal {
+			t.Fatal("IntVal not equal")
+		}
+	}
+}
