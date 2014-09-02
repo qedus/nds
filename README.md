@@ -12,7 +12,7 @@ One other benefit is that the standard `datastore.GetMulti` function only allows
 
 ## How To Use
 
-You can use this package in *exactly* the same way you would use `appengine/datastore`. However, it is important not to mix usage of functions between `appengine/datastore` and `github.com/qedus/nds` within your app. You will be liable to get stale datastore entities as `github.com/qedus/nds` goes to great lengths to keep caches in sync with the datastore.
+You can use this package in *exactly* the same way you would use `appengine/datastore`. However, it is important that you use `nds.Get*`, `nds.Put*` and `nds.Delete*` eitirly within your code and do not mix use of those functions between `appengine/datastore` and `github.com/qedus/nds` within your app as you will be liable to get stale datastore entities as `github.com/qedus/nds` goes to great lengths to keep caches in sync with the datastore.
 
 ## Limitations
 `PropertyLoadSaver` is currently not implemented.
