@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"appengine/datastore"
+	"appengine/memcache"
 )
 
 const (
@@ -25,6 +26,22 @@ var (
 	typeOfPropertyLoadSaver = reflect.TypeOf(
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
+
+	memcacheAddMulti            = memcache.AddMulti
+	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
+	memcacheGetMulti            = memcache.GetMulti
+	memcacheDeleteMulti         = memcache.DeleteMulti
+	memcacheSetMulti            = memcache.SetMulti
+
+	datastoreDeleteMulti = datastore.DeleteMulti
+	datastoreGetMulti    = datastore.GetMulti
+	datastorePutMulti    = datastore.PutMulti
+
+	// ErrInvalidKey is returned when an invalid key is presented.
+	ErrInvalidKey = datastore.ErrInvalidKey
+
+	// ErrNoSuchEntity is returned when no entity was found for a given key.
+	ErrNoSuchEntity = datastore.ErrNoSuchEntity
 )
 
 const (
@@ -54,7 +71,7 @@ func checkArgs(key *datastore.Key, val interface{}) error {
 	}
 
 	switch v.Kind() {
-	case reflect.Slice, reflect.Ptr:
+	case reflect.Ptr:
 		return nil
 	default:
 		return errors.New("nds: val must be a slice or pointer")
@@ -81,9 +98,7 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	}
 
 	switch elemType.Kind() {
-	case reflect.Struct:
-		return nil
-	case reflect.Interface:
+	case reflect.Struct, reflect.Interface:
 		return nil
 	case reflect.Ptr:
 		elemType = elemType.Elem()

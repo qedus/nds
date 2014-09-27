@@ -74,7 +74,7 @@ func GetMulti(c appengine.Context,
 
 		go func() {
 			if inTransaction(c) {
-				errs[index] = datastore.GetMulti(c,
+				errs[index] = datastoreGetMulti(c,
 					keySlice, valSlice.Interface())
 			} else {
 				errs[index] = getMulti(c, keySlice, valSlice)
@@ -111,6 +111,18 @@ func GetMulti(c appengine.Context,
 	return groupedErrs
 }
 
+// Get loads the entity stored for key into val, which must be a struct pointer.
+// Currently PropertyLoadSaver is not implemented. If there is no such entity
+// for the key, Get returns ErrNoSuchEntity.
+//
+// The values of val's unmatched struct fields are not modified, and matching
+// slice-typed fields are not reset before appending to them. In particular, it
+// is recommended to pass a pointer to a zero valued struct on each Get call.
+//
+// ErrFieldMismatch is returned when a field is to be loaded into a different
+// type than the one it was stored from, or when a field is missing or
+// unexported in the destination struct. ErrFieldMismatch is only returned if
+// val is a struct pointer.
 func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 
 	if err := checkArgs(key, val); err != nil {
@@ -125,7 +137,7 @@ func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 	return err
 }
 
-type cacheState int
+type cacheState byte
 
 const (
 	miss cacheState = iota
@@ -152,8 +164,8 @@ type cacheItem struct {
 // function, datastore or server fails at any point. The caching strategy is
 // borrowed from Python ndb with some improvements that eliminate some
 // consistency issues surrounding ndb, including http://goo.gl/3ByVlA.
-func getMulti(c appengine.Context, keys []*datastore.Key,
-	vals reflect.Value) error {
+func getMulti(c appengine.Context,
+	keys []*datastore.Key, vals reflect.Value) error {
 
 	cacheItems := make([]cacheItem, len(keys))
 	for i, key := range keys {
@@ -163,22 +175,15 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 		cacheItems[i].state = miss
 	}
 
-	if err := loadMemcache(c, cacheItems); err != nil {
-		return err
-	}
+	loadMemcache(c, cacheItems)
 
-	// Lock memcache while we get new data from the datastore.
-	if err := lockMemcache(c, cacheItems); err != nil {
-		return err
-	}
+	lockMemcache(c, cacheItems)
 
 	if err := loadDatastore(c, cacheItems, vals.Type()); err != nil {
 		return err
 	}
 
-	if err := saveMemcache(c, cacheItems); err != nil {
-		return err
-	}
+	saveMemcache(c, cacheItems)
 
 	me, errsNil := make(appengine.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {
@@ -194,20 +199,20 @@ func getMulti(c appengine.Context, keys []*datastore.Key,
 	return me
 }
 
-func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
+func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	memcacheKeys := make([]string, len(cacheItems))
 	for i, cacheItem := range cacheItems {
 		memcacheKeys[i] = cacheItem.memcacheKey
 	}
 
-	items, err := memcache.GetMulti(c, memcacheKeys)
+	items, err := memcacheGetMulti(c, memcacheKeys)
 	if err != nil {
 		for i := range cacheItems {
 			cacheItems[i].state = externalLock
 		}
-		c.Warningf("loadMemcache GetMulti %s", err)
-		return nil
+		c.Warningf("nds:loadMemcache GetMulti %s", err)
+		return
 	}
 
 	for i, memcacheKey := range memcacheKeys {
@@ -217,25 +222,24 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) error {
 				cacheItems[i].state = externalLock
 			case noneItem:
 				cacheItems[i].state = done
-				cacheItems[i].err = datastore.ErrNoSuchEntity
+				cacheItems[i].err = ErrNoSuchEntity
 			case entityItem:
 				err := unmarshal(item.Value, cacheItems[i].val)
 				if err == nil {
 					cacheItems[i].state = done
 				} else {
-					c.Warningf("loadMemcache unmarshal %s", err)
+					c.Warningf("nds:loadMemcache unmarshal %s", err)
 					cacheItems[i].state = externalLock
 				}
 			default:
-				c.Warningf("loadMemcache unknown item.Flags %d", item.Flags)
+				c.Warningf("nds:loadMemcache unknown item.Flags %d", item.Flags)
 				cacheItems[i].state = externalLock
 			}
 		}
 	}
-	return nil
 }
 
-func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
+func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	lockItems := make([]*memcache.Item, 0, len(cacheItems))
 	lockMemcacheKeys := make([]string, 0, len(cacheItems))
@@ -255,12 +259,12 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 	}
 
 	// We don't care if there are errors here.
-	if err := memcache.AddMulti(c, lockItems); err != nil {
-		c.Warningf("lockMemcache AddMulti %s", err)
+	if err := memcacheAddMulti(c, lockItems); err != nil {
+		c.Warningf("nds:lockMemcache AddMulti %s", err)
 	}
 
 	// Get the items again so we can use CAS when updating the cache.
-	items, err := memcache.GetMulti(c, lockMemcacheKeys)
+	items, err := memcacheGetMulti(c, lockMemcacheKeys)
 
 	// Cache failed so forget about it and just use the datastore.
 	if err != nil {
@@ -269,8 +273,8 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 				cacheItems[i].state = externalLock
 			}
 		}
-		c.Warningf("lockMemcache GetMulti %s", err)
-		return nil
+		c.Warningf("nds:lockMemcache GetMulti %s", err)
+		return
 	}
 
 	// Cache worked so figure out what items we got.
@@ -287,17 +291,18 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 					}
 				case noneItem:
 					cacheItems[i].state = done
-					cacheItems[i].err = datastore.ErrNoSuchEntity
+					cacheItems[i].err = ErrNoSuchEntity
 				case entityItem:
 					err := unmarshal(item.Value, cacheItems[i].val)
 					if err == nil {
 						cacheItems[i].state = done
 					} else {
-						c.Warningf("lockMemcache unmarshal %s", err)
+						c.Warningf("nds:lockMemcache unmarshal %s", err)
 						cacheItems[i].state = externalLock
 					}
 				default:
-					c.Warningf("lockMemcache unknown item.Flags %d", item.Flags)
+					c.Warningf("nds:lockMemcache unknown item.Flags %d",
+						item.Flags)
 					cacheItems[i].state = externalLock
 				}
 			} else {
@@ -307,8 +312,6 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func loadDatastore(c appengine.Context, cacheItems []cacheItem,
@@ -328,7 +331,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	}
 
 	var me appengine.MultiError
-	if err := datastore.GetMulti(c, keys, vals.Interface()); err == nil {
+	if err := datastoreGetMulti(c, keys, vals.Interface()); err == nil {
 		me = make(appengine.MultiError, len(keys))
 	} else if e, ok := err.(appengine.MultiError); ok {
 		me = e
@@ -348,7 +351,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 					cacheItems[index].item.Value = data
 				} else {
 					cacheItems[index].state = externalLock
-					c.Warningf("loadDatastore marshal %s", err)
+					c.Warningf("nds:loadDatastore marshal %s", err)
 				}
 			}
 		case datastore.ErrNoSuchEntity:
@@ -357,7 +360,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 				cacheItems[index].item.Expiration = 0
 				cacheItems[index].item.Value = []byte{}
 			}
-			cacheItems[index].err = datastore.ErrNoSuchEntity
+			cacheItems[index].err = ErrNoSuchEntity
 		default:
 			cacheItems[index].state = externalLock
 			cacheItems[index].err = me[i]
@@ -366,7 +369,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	return nil
 }
 
-func saveMemcache(c appengine.Context, cacheItems []cacheItem) error {
+func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	saveItems := make([]*memcache.Item, 0, len(cacheItems))
 	for _, cacheItem := range cacheItems {
@@ -375,12 +378,9 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) error {
 		}
 	}
 
-	// This is conservative. We could filter out appengine.MultiError and only
-	// return other types of errors.
-	if err := memcache.CompareAndSwapMulti(c, saveItems); err != nil {
-		c.Warningf("saveMemcache CompareAndSwapMulti %s", err)
+	if err := memcacheCompareAndSwapMulti(c, saveItems); err != nil {
+		c.Warningf("nds:saveMemcache CompareAndSwapMulti %s", err)
 	}
-	return nil
 }
 
 func marshal(v reflect.Value) ([]byte, error) {

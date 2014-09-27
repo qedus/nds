@@ -71,8 +71,8 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := nds.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
-		t.Fatal("expected datastore.ErrNoSuchEntity")
+	if err := nds.Get(c, key, &testEntity{}); err != nds.ErrNoSuchEntity {
+		t.Fatal("expected nds.ErrNoSuchEntity")
 	}
 }
 
@@ -104,7 +104,7 @@ func TestInterfaces(t *testing.T) {
 
 	entities = []interface{}{&testEntity{}}
 	if err := nds.GetMulti(c, keys, entities); err != nil {
-		//if err := datastore.GetMulti(c, keys, entities); err != nil {
+		//if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,7 +128,7 @@ func TestInterfaces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get from datastore with struct.
+	// Get from nds with struct.
 	entities = []interface{}{&testEntity{}}
 	if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
@@ -149,11 +149,11 @@ func TestInterfaces(t *testing.T) {
 		if len(me) != 1 {
 			t.Fatal("expected 1 appengine.MultiError")
 		}
-		if me[0] != datastore.ErrNoSuchEntity {
-			t.Fatal("expected datastore.ErrNoSuchEntity")
+		if me[0] != nds.ErrNoSuchEntity {
+			t.Fatal("expected nds.ErrNoSuchEntity")
 		}
 	} else {
-		t.Fatal("expected datastore.ErrNoSuchEntity", err)
+		t.Fatal("expected nds.ErrNoSuchEntity", err)
 	}
 }
 
@@ -185,8 +185,8 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 				t.Fatal("multi error length incorrect")
 			}
 			for _, e := range me {
-				if e != datastore.ErrNoSuchEntity {
-					t.Fatal("expecting datastore.ErrNoSuchEntity but got", e)
+				if e != nds.ErrNoSuchEntity {
+					t.Fatal("expecting nds.ErrNoSuchEntity but got", e)
 				}
 			}
 		}
@@ -295,7 +295,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 						entities[i].Val)
 				}
 			} else if me, ok := err.(appengine.MultiError); ok {
-				if me[i] != datastore.ErrNoSuchEntity {
+				if me[i] != nds.ErrNoSuchEntity {
 					t.Fatalf("incorrect error %+v, index %d, of %d",
 						me, i, count)
 				}
@@ -342,7 +342,7 @@ func TestMultiCache(t *testing.T) {
 		t.Fatal("incorrect key len")
 	}
 
-	// Get from datastore.
+	// Get from nds.
 	respEntities := make([]testEntity, len(keys))
 	err = nds.GetMulti(c, keys, respEntities)
 	if err == nil {
@@ -368,7 +368,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != datastore.ErrNoSuchEntity {
+			if me[i] != nds.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -401,7 +401,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != datastore.ErrNoSuchEntity {
+			if me[i] != nds.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -434,7 +434,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != datastore.ErrNoSuchEntity {
+			if me[i] != nds.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
