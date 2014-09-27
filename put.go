@@ -1,10 +1,11 @@
 package nds
 
 import (
+	"reflect"
+
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
-	"reflect"
 )
 
 // putMultiLimit is the App Engine datastore limit for the maximum number

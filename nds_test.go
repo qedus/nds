@@ -1,12 +1,15 @@
 package nds_test
 
 import (
+	"reflect"
+	"strconv"
+	"testing"
+
+	"github.com/qedus/nds"
+
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
-	"github.com/qedus/nds"
-	"strconv"
-	"testing"
 )
 
 func TestPutGetDelete(t *testing.T) {
@@ -494,5 +497,58 @@ func TestRunInTransaction(t *testing.T) {
 	entity = entities[0]
 	if entity.Val != 43 {
 		t.Fatalf("entity.Val != 43: %d", entity.Val)
+	}
+}
+
+func TestLoadSaveStruct(t *testing.T) {
+	type testEntity struct {
+		IntValue      int `datastore:",noindex"`
+		StringValue   string
+		MultipleValue []int64
+	}
+
+	te := testEntity{10, "ten", []int64{1, 2, 3}}
+	pl := datastore.PropertyList{}
+	if err := nds.SaveStruct(&te, &pl); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		value    interface{}
+		noIndex  bool
+		multiple bool
+	}{
+		{"IntValue", int64(10), true, false},
+		{"StringValue", "ten", false, false},
+		{"MultipleValue", int64(1), false, true},
+		{"MultipleValue", int64(2), false, true},
+		{"MultipleValue", int64(3), false, true},
+	}
+
+	for i, test := range tests {
+		prop := pl[i]
+		if prop.Name != test.name {
+			t.Fatal("incorrect name")
+		}
+		if prop.Value != test.value {
+			t.Fatalf("incorrect value required %+v got %+v",
+				prop.Value, test.value)
+		}
+		if prop.NoIndex != test.noIndex {
+			t.Fatal("incorrect no index")
+		}
+		if prop.Multiple != test.multiple {
+			t.Fatal("incorrect multiple flag")
+		}
+	}
+
+	loadTestEntity := testEntity{}
+	if err := nds.LoadStruct(&loadTestEntity, &pl); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(te, loadTestEntity) {
+		t.Fatal("entities not equal")
 	}
 }

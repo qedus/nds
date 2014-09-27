@@ -1,13 +1,14 @@
 package nds
 
 import (
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
 	"bytes"
 	"encoding/gob"
 	"reflect"
 	"sync"
+
+	"appengine"
+	"appengine/datastore"
+	"appengine/memcache"
 )
 
 // getMultiLimit is the App Engine datastore limit for the maximum number

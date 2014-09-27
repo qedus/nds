@@ -1,12 +1,13 @@
 package nds
 
 import (
-	"appengine/datastore"
 	"encoding/binary"
 	"errors"
 	"math/rand"
 	"reflect"
 	"time"
+
+	"appengine/datastore"
 )
 
 const (
@@ -95,4 +96,28 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 
 func createMemcacheKey(key *datastore.Key) string {
 	return memcachePrefix + key.Encode()
+}
+
+// SaveStruct saves src to a datastore.PropertyList.
+func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
+	c, err := make(chan datastore.Property), make(chan error)
+	go func() {
+		err <- datastore.SaveStruct(src, c)
+	}()
+	for p := range c {
+		*pl = append(*pl, p)
+	}
+	return <-err
+}
+
+// LoadStruct loads a datastore.PropertyList into dst.
+func LoadStruct(dst interface{}, pl *datastore.PropertyList) error {
+	c := make(chan datastore.Property)
+	go func() {
+		for _, p := range *pl {
+			c <- p
+		}
+		close(c)
+	}()
+	return datastore.LoadStruct(dst, c)
 }

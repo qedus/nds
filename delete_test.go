@@ -1,11 +1,13 @@
 package nds_test
 
 import (
+	"testing"
+
+	"github.com/qedus/nds"
+
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
-	"github.com/qedus/nds"
-	"testing"
 )
 
 func TestDelete(t *testing.T) {
