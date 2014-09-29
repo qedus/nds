@@ -128,10 +128,10 @@ func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
 
 // LoadStruct loads a datastore.PropertyList into dst. src must be a struct
 // pointer.
-func LoadStruct(dst interface{}, pl *datastore.PropertyList) error {
+func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
 	c := make(chan datastore.Property)
 	go func() {
-		for _, p := range *pl {
+		for _, p := range pl {
 			c <- p
 		}
 		close(c)
@@ -139,7 +139,7 @@ func LoadStruct(dst interface{}, pl *datastore.PropertyList) error {
 	return datastore.LoadStruct(dst, c)
 }
 
-func PropertyLoadSaverToPropertyList(
+func propertyLoadSaverToPropertyList(
 	pls datastore.PropertyLoadSaver, pl *datastore.PropertyList) error {
 	c, err := make(chan datastore.Property), make(chan error)
 	go func() {
@@ -151,7 +151,7 @@ func PropertyLoadSaverToPropertyList(
 	return <-err
 }
 
-func PropertyListToPropertyLoadSaver(
+func propertyListToPropertyLoadSaver(
 	pl datastore.PropertyList, pls datastore.PropertyLoadSaver) error {
 
 	c := make(chan datastore.Property)

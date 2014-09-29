@@ -104,7 +104,6 @@ func TestInterfaces(t *testing.T) {
 
 	entities = []interface{}{&testEntity{}}
 	if err := nds.GetMulti(c, keys, entities); err != nil {
-		//if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
 
@@ -544,7 +543,7 @@ func TestLoadSaveStruct(t *testing.T) {
 	}
 
 	loadTestEntity := testEntity{}
-	if err := nds.LoadStruct(&loadTestEntity, &pl); err != nil {
+	if err := nds.LoadStruct(&loadTestEntity, pl); err != nil {
 		t.Fatal(err)
 	}
 

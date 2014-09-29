@@ -238,8 +238,14 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	// GetMulti as memcache should have worked.
 	nds.SetDatastoreGetMulti(func(c appengine.Context,
 		keys []*datastore.Key, vals interface{}) error {
-		return errors.New("should not be called")
+		if len(keys) != 0 {
+			return errors.New("should not be called")
+		}
+		return nil
 	})
+	defer func() {
+		nds.SetDatastoreGetMulti(datastore.GetMulti)
+	}()
 	tes := make([]testEntity, len(entities))
 	if err := nds.GetMulti(c, keys, tes); err != nil {
 		t.Fatal(err)

@@ -6,6 +6,8 @@ import (
 	"appengine/memcache"
 )
 
+var PropertyLoadSaverToPropertyList = propertyLoadSaverToPropertyList
+
 func SetMemcacheAddMulti(f func(c appengine.Context,
 	items []*memcache.Item) error) {
 	memcacheAddMulti = f

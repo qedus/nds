@@ -3,7 +3,6 @@ package nds
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -42,9 +41,6 @@ const getMultiLimit = 1000
 // Increase the datastore timeout if you get datastore_v3: TIMEOUT errors when
 // getting thousands of entities. You can do this using
 // http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
-//
-// vals currently only takes slices of structs. It does not take slices of
-// pointers, interfaces or datastore.PropertyLoadSaver.
 func GetMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) error {
 
@@ -320,14 +316,14 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 
 	keys := make([]*datastore.Key, 0, len(cacheItems))
 	//vals := reflect.MakeSlice(valsType, 0, len(cacheItems))
-	vals := make([]datastore.PropertyList, len(cacheItems))
+	vals := make([]datastore.PropertyList, 0, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
 
 	for i, cacheItem := range cacheItems {
 		switch cacheItem.state {
 		case internalLock, externalLock:
 			keys = append(keys, cacheItem.key)
-			//		vals = reflect.Append(vals, cacheItem.val)
+			vals = append(vals, datastore.PropertyList{})
 			cacheItemsIndex = append(cacheItemsIndex, i)
 		}
 	}
@@ -344,26 +340,15 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	for i, index := range cacheItemsIndex {
 		switch me[i] {
 		case nil:
-			//setValue(cacheItems[index].val, vals.Index(i))
 			pl := vals[i]
-			fmt.Println("PL is", pl)
 			val := cacheItems[index].val
-			switch t := reflect.Indirect(val).Addr().Interface().(type) {
-			case datastore.PropertyLoadSaver:
-				if err := PropertyListToPropertyLoadSaver(pl, t); err != nil {
-					return err
-				}
-			default:
-				if err := LoadStruct(t, &pl); err != nil {
-					return err
-				}
+			if err := setValue(val, pl); err != nil {
+				return err
 			}
-			fmt.Println("val is", val.Interface())
 
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = entityItem
 				cacheItems[index].item.Expiration = 0
-				//if data, err := marshal(vals.Index(i)); err == nil {
 				if data, err := marshal(pl); err == nil {
 					cacheItems[index].item.Value = data
 				} else {
@@ -417,10 +402,22 @@ func unmarshal(val reflect.Value, data []byte) error {
 }
 
 func setValue(val reflect.Value, pl datastore.PropertyList) error {
-	switch t := reflect.Indirect(val).Addr().Interface().(type) {
+
+	if reflect.PtrTo(val.Type()).Implements(typeOfPropertyLoadSaver) {
+		val = val.Addr()
+	}
+
+	switch t := val.Interface().(type) {
 	case datastore.PropertyLoadSaver:
-		return PropertyListToPropertyLoadSaver(pl, t)
+		return propertyListToPropertyLoadSaver(pl, t)
+	case *datastore.PropertyLoadSaver:
+		return propertyListToPropertyLoadSaver(pl, *t)
 	default:
-		return LoadStruct(t, &pl)
+
+		val := reflect.Indirect(val)
+		if val.Kind() == reflect.Struct {
+			val = val.Addr()
+		}
+		return LoadStruct(val.Interface(), pl)
 	}
 }

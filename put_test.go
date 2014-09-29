@@ -52,9 +52,9 @@ func TestPutPropertyLoadSaver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	getPl := &datastore.PropertyList{}
+	getPl := datastore.PropertyList{}
 	if err := nds.GetMulti(c,
-		keys, []datastore.PropertyLoadSaver{getPl}); err != nil {
+		keys, []datastore.PropertyLoadSaver{&getPl}); err != nil {
 		t.Fatal(err)
 	}
 	getTe := &testEntity{}
