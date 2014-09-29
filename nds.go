@@ -13,7 +13,7 @@ import (
 
 const (
 	// memcachePrefix is the namespace memcache uses to store entities.
-	memcachePrefix = "NDS0:"
+	memcachePrefix = "NDS1:"
 
 	// memcacheLockTime is the maximum length of time a memcache lock will be
 	// held for. 32 seconds is choosen as 30 seconds is the maximum amount of
