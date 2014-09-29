@@ -219,7 +219,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 				cacheItems[i].state = externalLock
 			case noneItem:
 				cacheItems[i].state = done
-				cacheItems[i].err = ErrNoSuchEntity
+				cacheItems[i].err = datastore.ErrNoSuchEntity
 			case entityItem:
 				err := unmarshal(cacheItems[i].val, item.Value)
 				if err == nil {
@@ -288,7 +288,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 					}
 				case noneItem:
 					cacheItems[i].state = done
-					cacheItems[i].err = ErrNoSuchEntity
+					cacheItems[i].err = datastore.ErrNoSuchEntity
 				case entityItem:
 					err := unmarshal(cacheItems[i].val, item.Value)
 					if err == nil {
@@ -362,7 +362,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 				cacheItems[index].item.Expiration = 0
 				cacheItems[index].item.Value = []byte{}
 			}
-			cacheItems[index].err = ErrNoSuchEntity
+			cacheItems[index].err = datastore.ErrNoSuchEntity
 		default:
 			cacheItems[index].state = externalLock
 			cacheItems[index].err = me[i]

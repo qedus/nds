@@ -71,8 +71,8 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := nds.Get(c, key, &testEntity{}); err != nds.ErrNoSuchEntity {
-		t.Fatal("expected nds.ErrNoSuchEntity")
+	if err := nds.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
+		t.Fatal("expected datastore.ErrNoSuchEntity")
 	}
 }
 
@@ -148,11 +148,11 @@ func TestInterfaces(t *testing.T) {
 		if len(me) != 1 {
 			t.Fatal("expected 1 appengine.MultiError")
 		}
-		if me[0] != nds.ErrNoSuchEntity {
-			t.Fatal("expected nds.ErrNoSuchEntity")
+		if me[0] != datastore.ErrNoSuchEntity {
+			t.Fatal("expected datastore.ErrNoSuchEntity")
 		}
 	} else {
-		t.Fatal("expected nds.ErrNoSuchEntity", err)
+		t.Fatal("expected datastore.ErrNoSuchEntity", err)
 	}
 }
 
@@ -184,8 +184,8 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 				t.Fatal("multi error length incorrect")
 			}
 			for _, e := range me {
-				if e != nds.ErrNoSuchEntity {
-					t.Fatal("expecting nds.ErrNoSuchEntity but got", e)
+				if e != datastore.ErrNoSuchEntity {
+					t.Fatal("expecting datastore.ErrNoSuchEntity but got", e)
 				}
 			}
 		}
@@ -294,7 +294,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 						entities[i].Val)
 				}
 			} else if me, ok := err.(appengine.MultiError); ok {
-				if me[i] != nds.ErrNoSuchEntity {
+				if me[i] != datastore.ErrNoSuchEntity {
 					t.Fatalf("incorrect error %+v, index %d, of %d",
 						me, i, count)
 				}
@@ -367,7 +367,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != nds.ErrNoSuchEntity {
+			if me[i] != datastore.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -400,7 +400,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != nds.ErrNoSuchEntity {
+			if me[i] != datastore.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}
@@ -433,7 +433,7 @@ func TestMultiCache(t *testing.T) {
 			if re.Val != 0 {
 				t.Fatal("entity not zeroed")
 			}
-			if me[i] != nds.ErrNoSuchEntity {
+			if me[i] != datastore.ErrNoSuchEntity {
 				t.Fatalf("incorrect error %+v, index %d, of %d",
 					me, i, entityCount)
 			}

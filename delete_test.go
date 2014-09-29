@@ -50,7 +50,7 @@ func TestDelete(t *testing.T) {
 	entities = make([]testEntity, 1)
 	err = nds.GetMulti(c, keys, entities)
 	if me, ok := err.(appengine.MultiError); ok {
-		if me[0] != nds.ErrNoSuchEntity {
+		if me[0] != datastore.ErrNoSuchEntity {
 			t.Fatal("entity should be deleted", entities)
 		}
 	} else {
@@ -65,7 +65,7 @@ func TestDeleteNilKey(t *testing.T) {
 	}
 	defer c.Close()
 
-	if err := nds.Delete(c, nil); err != nds.ErrInvalidKey {
+	if err := nds.Delete(c, nil); err != datastore.ErrInvalidKey {
 		t.Fatal("expected nil key error")
 	}
 }
@@ -77,7 +77,7 @@ func TestDeleteIncompleteKey(t *testing.T) {
 	}
 	defer c.Close()
 
-	if err := nds.Delete(c, nil); err != nds.ErrInvalidKey {
+	if err := nds.Delete(c, nil); err != datastore.ErrInvalidKey {
 		t.Fatal("expected invalid key error")
 	}
 }

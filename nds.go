@@ -36,12 +36,6 @@ var (
 	datastoreDeleteMulti = datastore.DeleteMulti
 	datastoreGetMulti    = datastore.GetMulti
 	datastorePutMulti    = datastore.PutMulti
-
-	// ErrInvalidKey is returned when an invalid key is presented.
-	ErrInvalidKey = datastore.ErrInvalidKey
-
-	// ErrNoSuchEntity is returned when no entity was found for a given key.
-	ErrNoSuchEntity = datastore.ErrNoSuchEntity
 )
 
 const (
