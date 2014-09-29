@@ -552,3 +552,25 @@ func TestLoadSaveStruct(t *testing.T) {
 		t.Fatal("entities not equal")
 	}
 }
+
+func TestDrainToPropertyList(t *testing.T) {
+	pl := datastore.PropertyList{
+		datastore.Property{"IntVal", 2, false, false},
+		datastore.Property{"StringVal", "test", false, false},
+	}
+
+	drainedPL := datastore.PropertyList{}
+	if err := nds.PropertyLoadSaverToPropertyList(&pl, &drainedPL); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(drainedPL) != 2 {
+		t.Fatal("expected two properties")
+	}
+
+	for i, p := range pl {
+		if !reflect.DeepEqual(p, drainedPL[i]) {
+			t.Fatal("properties not equal")
+		}
+	}
+}

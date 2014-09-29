@@ -3,6 +3,7 @@ package nds
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -224,7 +225,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 				cacheItems[i].state = done
 				cacheItems[i].err = ErrNoSuchEntity
 			case entityItem:
-				err := unmarshal(item.Value, cacheItems[i].val)
+				err := unmarshal(cacheItems[i].val, item.Value)
 				if err == nil {
 					cacheItems[i].state = done
 				} else {
@@ -293,7 +294,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 					cacheItems[i].state = done
 					cacheItems[i].err = ErrNoSuchEntity
 				case entityItem:
-					err := unmarshal(item.Value, cacheItems[i].val)
+					err := unmarshal(cacheItems[i].val, item.Value)
 					if err == nil {
 						cacheItems[i].state = done
 					} else {
@@ -318,20 +319,21 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	valsType reflect.Type) error {
 
 	keys := make([]*datastore.Key, 0, len(cacheItems))
-	vals := reflect.MakeSlice(valsType, 0, len(cacheItems))
+	//vals := reflect.MakeSlice(valsType, 0, len(cacheItems))
+	vals := make([]datastore.PropertyList, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
 
 	for i, cacheItem := range cacheItems {
 		switch cacheItem.state {
 		case internalLock, externalLock:
 			keys = append(keys, cacheItem.key)
-			vals = reflect.Append(vals, cacheItem.val)
+			//		vals = reflect.Append(vals, cacheItem.val)
 			cacheItemsIndex = append(cacheItemsIndex, i)
 		}
 	}
 
 	var me appengine.MultiError
-	if err := datastoreGetMulti(c, keys, vals.Interface()); err == nil {
+	if err := datastoreGetMulti(c, keys, vals); err == nil {
 		me = make(appengine.MultiError, len(keys))
 	} else if e, ok := err.(appengine.MultiError); ok {
 		me = e
@@ -342,12 +344,27 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	for i, index := range cacheItemsIndex {
 		switch me[i] {
 		case nil:
-			setValue(cacheItems[index].val, vals.Index(i))
+			//setValue(cacheItems[index].val, vals.Index(i))
+			pl := vals[i]
+			fmt.Println("PL is", pl)
+			val := cacheItems[index].val
+			switch t := reflect.Indirect(val).Addr().Interface().(type) {
+			case datastore.PropertyLoadSaver:
+				if err := PropertyListToPropertyLoadSaver(pl, t); err != nil {
+					return err
+				}
+			default:
+				if err := LoadStruct(t, &pl); err != nil {
+					return err
+				}
+			}
+			fmt.Println("val is", val.Interface())
 
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = entityItem
 				cacheItems[index].item.Expiration = 0
-				if data, err := marshal(vals.Index(i)); err == nil {
+				//if data, err := marshal(vals.Index(i)); err == nil {
+				if data, err := marshal(pl); err == nil {
 					cacheItems[index].item.Value = data
 				} else {
 					cacheItems[index].state = externalLock
@@ -383,35 +400,27 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
 	}
 }
 
-func marshal(v reflect.Value) ([]byte, error) {
+func marshal(pl datastore.PropertyList) ([]byte, error) {
 	buf := bytes.Buffer{}
-	if err := gob.NewEncoder(&buf).Encode(v.Interface()); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(&pl); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func unmarshal(data []byte, v reflect.Value) error {
-	v = reflect.Indirect(v)
-	if v.Kind() == reflect.Interface {
-		v = v.Elem()
+func unmarshal(val reflect.Value, data []byte) error {
+	pl := datastore.PropertyList{}
+	if err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(&pl); err != nil {
+		return err
 	}
-	if v.Kind() != reflect.Ptr {
-		v = v.Addr()
-	}
-	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(v.Interface())
+	return setValue(val, pl)
 }
 
-func setValue(dst reflect.Value, src reflect.Value) {
-	if dst.Kind() == reflect.Struct {
-		if src.Kind() != reflect.Struct {
-			src = reflect.Indirect(src)
-		}
-		dst.Set(src)
-	} else if dst.Kind() == reflect.Ptr {
-		if src.Kind() != reflect.Ptr {
-			src = src.Addr()
-		}
-		dst.Elem().Set(src.Elem())
+func setValue(val reflect.Value, pl datastore.PropertyList) error {
+	switch t := reflect.Indirect(val).Addr().Interface().(type) {
+	case datastore.PropertyLoadSaver:
+		return PropertyListToPropertyLoadSaver(pl, t)
+	default:
+		return LoadStruct(t, &pl)
 	}
 }

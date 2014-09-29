@@ -191,7 +191,6 @@ func TestGetMultiNoKeys(t *testing.T) {
 	}
 }
 
-// datastore.PropertyLoadSaver is not supported to test it does not work.
 func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
@@ -199,17 +198,51 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	}
 	defer c.Close()
 
+	type testEntity struct {
+		IntVal int
+	}
+
 	keys := []*datastore.Key{}
 	entities := []datastore.PropertyList{}
 
-	for i := int64(1); i < 3; i++ {
-		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
-		entities = append(entities, datastore.PropertyList{})
+	for i := 1; i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", int64(i), nil))
+
+		pl := datastore.PropertyList{}
+		if err := nds.SaveStruct(&testEntity{i}, &pl); err != nil {
+			t.Fatal(err)
+		}
+		entities = append(entities, pl)
 	}
-	if err := nds.GetMulti(c, keys, entities); err == nil {
-		t.Fatal("expecting error")
-	} else {
-		t.Log(err)
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prime the cache.
+	uncachedEntities := make([]datastore.PropertyList, len(keys))
+	if err := nds.GetMulti(c, keys, uncachedEntities); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, e := range entities {
+		if !reflect.DeepEqual(e, uncachedEntities[i]) {
+			t.Fatal("uncachedEntities not equal", e, uncachedEntities[i])
+		}
+	}
+
+	// We know the datastore supports property load saver but we need to make
+	// sure that memcache does by ensuring memcache does not error when we
+	// change to fetching with structs.
+	// Do this by making sure the datastore is not called on this following
+	// GetMulti as memcache should have worked.
+	nds.SetDatastoreGetMulti(func(c appengine.Context,
+		keys []*datastore.Key, vals interface{}) error {
+		return errors.New("should not be called")
+	})
+	tes := make([]testEntity, len(entities))
+	if err := nds.GetMulti(c, keys, tes); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -28,6 +28,44 @@ func TestPutMultiNoPropertyList(t *testing.T) {
 	}
 }
 
+func TestPutPropertyLoadSaver(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int
+	}
+
+	te := &testEntity{2}
+	pl := &datastore.PropertyList{}
+	if err := nds.SaveStruct(te, pl); err != nil {
+		t.Fatal(err)
+	}
+
+	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
+
+	if _, err := nds.PutMulti(c,
+		keys, []datastore.PropertyLoadSaver{pl}); err != nil {
+		t.Fatal(err)
+	}
+
+	getPl := &datastore.PropertyList{}
+	if err := nds.GetMulti(c,
+		keys, []datastore.PropertyLoadSaver{getPl}); err != nil {
+		t.Fatal(err)
+	}
+	getTe := &testEntity{}
+	if err := nds.LoadStruct(getTe, getPl); err != nil {
+		t.Fatal(err)
+	}
+	if te.IntVal != getTe.IntVal {
+		t.Fatal("expected same IntVal", getTe.IntVal)
+	}
+}
+
 func TestPutNilArgs(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {

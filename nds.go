@@ -94,7 +94,7 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 
 	elemType := v.Type().Elem()
 	if reflect.PtrTo(elemType).Implements(typeOfPropertyLoadSaver) {
-		return errors.New("nds: PropertyLoadSaver not supporded")
+		return nil
 	}
 
 	switch elemType.Kind() {
@@ -137,4 +137,30 @@ func LoadStruct(dst interface{}, pl *datastore.PropertyList) error {
 		close(c)
 	}()
 	return datastore.LoadStruct(dst, c)
+}
+
+func PropertyLoadSaverToPropertyList(
+	pls datastore.PropertyLoadSaver, pl *datastore.PropertyList) error {
+	c, err := make(chan datastore.Property), make(chan error)
+	go func() {
+		err <- pls.Save(c)
+	}()
+	for p := range c {
+		*pl = append(*pl, p)
+	}
+	return <-err
+}
+
+func PropertyListToPropertyLoadSaver(
+	pl datastore.PropertyList, pls datastore.PropertyLoadSaver) error {
+
+	c := make(chan datastore.Property)
+	go func() {
+		for _, p := range pl {
+			c <- p
+		}
+		close(c)
+	}()
+
+	return pls.Load(c)
 }
