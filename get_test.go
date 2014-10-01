@@ -3,6 +3,7 @@ package nds_test
 import (
 	"io"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/qedus/nds"
@@ -655,6 +656,56 @@ func TestGetMultiMemcacheFlagCorrupt(t *testing.T) {
 	}()
 
 	// Get from datastore.
+	response := make([]testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < len(keys); i++ {
+		if entities[i].IntVal != response[i].IntVal {
+			t.Fatal("IntVal not equal")
+		}
+	}
+}
+
+func TestGetMultiLockMemcacheFailure(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	countLock := &sync.Mutex{}
+	count := 0
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		items, err := memcache.GetMulti(c, keys)
+		if count == 1 {
+			items, err = nil, errors.New("expected lock error")
+		}
+		countLock.Lock()
+		count++
+		countLock.Unlock()
+		return items, err
+	})
+	defer func() {
+		nds.SetMemcacheGetMulti(memcache.GetMulti)
+	}()
+
 	response := make([]testEntity, len(keys))
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
