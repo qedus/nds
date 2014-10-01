@@ -5,7 +5,7 @@ of making your app faster as memcache access is often 10x faster than datastore
 access. It can also make your app cheaper to run as memcache calls are free.
 
 This package goes to great lengths to ensure that stale datastore values are
-never returned to clients, i.e. the caching layer is strongly consistent. 
+never returned to clients, i.e. the caching layer is strongly consistent.
 It does this by using a similar strategy to Python's ndb. However, this
 package fixes a couple of subtle edge case bugs that are found in ndb. See
 http://goo.gl/3ByVlA for one such bug.

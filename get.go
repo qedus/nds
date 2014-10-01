@@ -407,17 +407,13 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 		val = val.Addr()
 	}
 
-	switch t := val.Interface().(type) {
-	case datastore.PropertyLoadSaver:
-		return propertyListToPropertyLoadSaver(pl, t)
-	case *datastore.PropertyLoadSaver:
-		return propertyListToPropertyLoadSaver(pl, *t)
-	default:
-
-		val := reflect.Indirect(val)
-		if val.Kind() == reflect.Struct {
-			val = val.Addr()
-		}
-		return LoadStruct(val.Interface(), pl)
+	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
+		return propertyListToPropertyLoadSaver(pl, pls)
 	}
+
+	//val = reflect.Indirect(val)
+	if val.Kind() == reflect.Struct {
+		val = val.Addr()
+	}
+	return LoadStruct(val.Interface(), pl)
 }

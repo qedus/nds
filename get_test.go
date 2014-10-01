@@ -39,7 +39,7 @@ func TestGetMultiStruct(t *testing.T) {
 
 	// Get from datastore.
 	response := make([]testEntity, len(keys))
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -50,7 +50,7 @@ func TestGetMultiStruct(t *testing.T) {
 
 	// Get from cache.
 	response = make([]testEntity, len(keys))
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -60,7 +60,7 @@ func TestGetMultiStruct(t *testing.T) {
 	}
 }
 
-func TestGetMultiPtr(t *testing.T) {
+func TestGetMultiStructPtr(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestGetMultiPtr(t *testing.T) {
 		response[i] = &testEntity{}
 	}
 
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -102,7 +102,7 @@ func TestGetMultiPtr(t *testing.T) {
 	for i := 0; i < len(response); i++ {
 		response[i] = &testEntity{}
 	}
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -140,7 +140,7 @@ func TestGetMultiInterface(t *testing.T) {
 		response[i] = &testEntity{}
 	}
 
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -158,7 +158,7 @@ func TestGetMultiInterface(t *testing.T) {
 	for i := 0; i < len(response); i++ {
 		response[i] = &testEntity{}
 	}
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -169,25 +169,6 @@ func TestGetMultiInterface(t *testing.T) {
 		} else {
 			t.Fatal("incorrect type")
 		}
-	}
-}
-
-func TestGetMultiNoKeys(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
-	type testEntity struct {
-		IntVal int64
-	}
-
-	keys := []*datastore.Key{}
-	entities := []testEntity{}
-
-	if err := nds.GetMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -219,7 +200,7 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Prime the cache.
+	// Prime the cache..
 	uncachedEntities := make([]datastore.PropertyList, len(keys))
 	if err := nds.GetMulti(c, keys, uncachedEntities); err != nil {
 		t.Fatal(err)
@@ -228,6 +209,18 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	for i, e := range entities {
 		if !reflect.DeepEqual(e, uncachedEntities[i]) {
 			t.Fatal("uncachedEntities not equal", e, uncachedEntities[i])
+		}
+	}
+
+	// Use cache.
+	cachedEntities := make([]datastore.PropertyList, len(keys))
+	if err := nds.GetMulti(c, keys, cachedEntities); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, e := range entities {
+		if !reflect.DeepEqual(e, cachedEntities[i]) {
+			t.Fatal("cachedEntities not equal", e, cachedEntities[i])
 		}
 	}
 
@@ -248,6 +241,25 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	}()
 	tes := make([]testEntity, len(entities))
 	if err := nds.GetMulti(c, keys, tes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetMultiNoKeys(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+
+	if err := nds.GetMulti(c, keys, entities); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -278,7 +290,7 @@ func TestGetMultiInterfaceError(t *testing.T) {
 	// No errors expected.
 	response := []interface{}{&testEntity{}, &testEntity{}}
 
-	if err := datastore.GetMulti(c, keys, response); err != nil {
+	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
 	for i := int64(0); i < 2; i++ {
@@ -294,7 +306,7 @@ func TestGetMultiInterfaceError(t *testing.T) {
 	// Get from cache.
 	// Errors expected.
 	response = []interface{}{&testEntity{}, testEntity{}}
-	if err := datastore.GetMulti(c, keys, response); err == nil {
+	if err := nds.GetMulti(c, keys, response); err == nil {
 		t.Fatal("expected invalid entity type error")
 	}
 }
@@ -399,7 +411,7 @@ func TestGetSliceProperty(t *testing.T) {
 	intVals := []int64{0, 1, 2, 3}
 	val := &testEntity{intVals}
 
-	if _, err := datastore.Put(c, key, val); err != nil {
+	if _, err := nds.Put(c, key, val); err != nil {
 		t.Fatal(err)
 	}
 
