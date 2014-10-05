@@ -315,7 +315,6 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	valsType reflect.Type) error {
 
 	keys := make([]*datastore.Key, 0, len(cacheItems))
-	//vals := reflect.MakeSlice(valsType, 0, len(cacheItems))
 	vals := make([]datastore.PropertyList, 0, len(cacheItems))
 	cacheItemsIndex := make([]int, 0, len(cacheItems))
 
@@ -411,7 +410,6 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 		return propertyListToPropertyLoadSaver(pl, pls)
 	}
 
-	//val = reflect.Indirect(val)
 	if val.Kind() == reflect.Struct {
 		val = val.Addr()
 	}
