@@ -2,7 +2,6 @@ package nds
 
 import (
 	"bytes"
-	"encoding/gob"
 	"reflect"
 	"sync"
 
@@ -382,36 +381,4 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
 	if err := memcacheCompareAndSwapMulti(c, saveItems); err != nil {
 		c.Warningf("nds:saveMemcache CompareAndSwapMulti %s", err)
 	}
-}
-
-func marshal(pl datastore.PropertyList) ([]byte, error) {
-	buf := bytes.Buffer{}
-	if err := gob.NewEncoder(&buf).Encode(&pl); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func unmarshal(val reflect.Value, data []byte) error {
-	pl := datastore.PropertyList{}
-	if err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(&pl); err != nil {
-		return err
-	}
-	return setValue(val, pl)
-}
-
-func setValue(val reflect.Value, pl datastore.PropertyList) error {
-
-	if reflect.PtrTo(val.Type()).Implements(typeOfPropertyLoadSaver) {
-		val = val.Addr()
-	}
-
-	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
-		return propertyListToPropertyLoadSaver(pl, pls)
-	}
-
-	if val.Kind() == reflect.Struct {
-		val = val.Addr()
-	}
-	return loadStruct(val.Interface(), pl)
 }

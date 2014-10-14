@@ -1,6 +1,8 @@
 package nds
 
 import (
+	"reflect"
+
 	"appengine"
 	"appengine/datastore"
 	"appengine/memcache"
@@ -46,4 +48,12 @@ func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
 
 func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
 	return loadStruct(dst, pl)
+}
+
+func MarshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
+	return marshalPropertyList(pl)
+}
+
+func UnmarshalPropertyList(val reflect.Value, data []byte) error {
+	return unmarshalPropertyList(val, data)
 }

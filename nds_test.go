@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/qedus/nds"
 
@@ -571,5 +572,78 @@ func TestDrainToPropertyList(t *testing.T) {
 		if !reflect.DeepEqual(p, drainedPL[i]) {
 			t.Fatal("properties not equal")
 		}
+	}
+}
+
+func TestMarshalUnmarshalPropertyList(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	timeVal := time.Now()
+	timeProp := datastore.Property{Name: "Time",
+		Value: timeVal, NoIndex: false, Multiple: false}
+
+	byteStringVal := datastore.ByteString{0x23}
+	byteStringProp := datastore.Property{Name: "ByteString",
+		Value: byteStringVal, NoIndex: false, Multiple: false}
+
+	keyVal := datastore.NewKey(c, "Entity", "stringID", 0, nil)
+	keyProp := datastore.Property{Name: "Key",
+		Value: keyVal, NoIndex: false, Multiple: false}
+
+	blobKeyVal := appengine.BlobKey("blobkey")
+	blobKeyProp := datastore.Property{Name: "BlobKey",
+		Value: blobKeyVal, NoIndex: false, Multiple: false}
+
+	geoPointVal := appengine.GeoPoint{1, 2}
+	geoPointProp := datastore.Property{Name: "GeoPoint",
+		Value: geoPointVal, NoIndex: false, Multiple: false}
+
+	pl := datastore.PropertyList{
+		timeProp,
+		byteStringProp,
+		keyProp,
+		blobKeyProp,
+		geoPointProp,
+	}
+	data, err := nds.MarshalPropertyList(pl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testEntity := &struct {
+		Time       time.Time
+		ByteString datastore.ByteString
+		Key        *datastore.Key
+		BlobKey    appengine.BlobKey
+		GeoPoint   appengine.GeoPoint
+	}{}
+
+	if err := nds.UnmarshalPropertyList(
+		reflect.ValueOf(testEntity), data); err != nil {
+		t.Fatal(err)
+	}
+
+	if !testEntity.Time.Equal(timeVal) {
+		t.Fatal("timeVal not equal")
+	}
+
+	if string(testEntity.ByteString) != string(byteStringVal) {
+		t.Fatal("byteStringVal not equal")
+	}
+
+	if !testEntity.Key.Equal(keyVal) {
+		t.Fatal("keyVal not equal")
+	}
+
+	if testEntity.BlobKey != blobKeyVal {
+		t.Fatal("blobKeyVal not equal")
+	}
+
+	if !reflect.DeepEqual(testEntity.GeoPoint, geoPointVal) {
+		t.Fatal("geoPointVal not equal")
 	}
 }

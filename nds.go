@@ -1,11 +1,15 @@
 package nds
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"math/rand"
 	"reflect"
 	"time"
+
+	"appengine"
 
 	"appengine/datastore"
 	"appengine/memcache"
@@ -26,7 +30,11 @@ var (
 	typeOfPropertyLoadSaver = reflect.TypeOf(
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
+)
 
+var (
+	// The variables in this block are here so that we can test all error code
+	// paths by substituting the respective functions with error producing ones.
 	memcacheAddMulti            = memcache.AddMulti
 	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
 	memcacheGetMulti            = memcache.GetMulti
@@ -36,6 +44,9 @@ var (
 	datastoreDeleteMulti = datastore.DeleteMulti
 	datastoreGetMulti    = datastore.GetMulti
 	datastorePutMulti    = datastore.PutMulti
+
+	marshal   = marshalPropertyList
+	unmarshal = unmarshalPropertyList
 )
 
 const (
@@ -43,6 +54,14 @@ const (
 	entityItem
 	lockItem
 )
+
+func init() {
+	gob.Register(time.Time{})
+	gob.Register(datastore.ByteString{})
+	gob.Register(&datastore.Key{})
+	gob.Register(appengine.BlobKey(""))
+	gob.Register(appengine.GeoPoint{})
+}
 
 func itemLock() []byte {
 	b := make([]byte, 4)
@@ -157,4 +176,36 @@ func propertyListToPropertyLoadSaver(
 	}()
 
 	return pls.Load(c)
+}
+
+func marshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
+	buf := bytes.Buffer{}
+	if err := gob.NewEncoder(&buf).Encode(&pl); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func unmarshalPropertyList(val reflect.Value, data []byte) error {
+	pl := datastore.PropertyList{}
+	if err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(&pl); err != nil {
+		return err
+	}
+	return setValue(val, pl)
+}
+
+func setValue(val reflect.Value, pl datastore.PropertyList) error {
+
+	if reflect.PtrTo(val.Type()).Implements(typeOfPropertyLoadSaver) {
+		val = val.Addr()
+	}
+
+	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
+		return propertyListToPropertyLoadSaver(pl, pls)
+	}
+
+	if val.Kind() == reflect.Struct {
+		val = val.Addr()
+	}
+	return loadStruct(val.Interface(), pl)
 }
