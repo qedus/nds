@@ -21,7 +21,7 @@ func TestTransactionOptions(t *testing.T) {
 		Val int
 	}
 
-	opts := &nds.TransactionOptions{XG: true}
+	opts := &datastore.TransactionOptions{XG: true}
 	err = nds.RunInTransaction(c, func(tc appengine.Context) error {
 		for i := 0; i < 4; i++ {
 			key := datastore.NewIncompleteKey(tc, "Entity", nil)
@@ -36,7 +36,7 @@ func TestTransactionOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts = &nds.TransactionOptions{XG: false}
+	opts = &datastore.TransactionOptions{XG: false}
 	err = nds.RunInTransaction(c, func(tc appengine.Context) error {
 		for i := 0; i < 4; i++ {
 			key := datastore.NewIncompleteKey(tc, "Entity", nil)
