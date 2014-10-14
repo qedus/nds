@@ -39,3 +39,11 @@ func SetDatastoreGetMulti(f func(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) error) {
 	datastoreGetMulti = f
 }
+
+func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
+	return saveStruct(src, pl)
+}
+
+func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
+	return loadStruct(dst, pl)
+}
