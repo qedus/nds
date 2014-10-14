@@ -18,22 +18,12 @@ func inTransaction(c appengine.Context) bool {
 // interacts correcly with memcache. You should always use this method for
 // transactions if you are using the NDS package.
 func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
-	opts *TransactionOptions) error {
-
-	txOpts := &datastore.TransactionOptions{}
-	if opts != nil {
-		txOpts.XG = opts.XG
-	}
+	opts *datastore.TransactionOptions) error {
 
 	return datastore.RunInTransaction(c, func(tc appengine.Context) error {
 		txc := txContext{
 			Context: tc,
 		}
 		return f(txc)
-	}, txOpts)
-}
-
-// TransactionOptions are the options for running a transaction.
-type TransactionOptions struct {
-	XG bool
+	}, opts)
 }
