@@ -32,12 +32,21 @@ var (
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
 )
 
+// The variables in this block are here so that we can test all error code
+// paths by substituting the respective functions with error producing ones.
 var (
-	// The variables in this block are here so that we can test all error code
-	// paths by substituting the respective functions with error producing ones.
 	datastoreDeleteMulti = datastore.DeleteMulti
 	datastoreGetMulti    = datastore.GetMulti
 	datastorePutMulti    = datastore.PutMulti
+
+	// Memcache calls are replaced with ones that don't hit the backend service
+	// if len(keys) or len(items) == 0. This should be changed once issue
+	// http://goo.gl/AW96Fi has been resolved with the Go App Engine SDK.
+	memcacheAddMulti            = zeroMemcacheAddMulti
+	memcacheCompareAndSwapMulti = zeroMemcacheCompareAndSwapMulti
+	memcacheDeleteMulti         = zeroMemcacheDeleteMulti
+	memcacheGetMulti            = zeroMemcacheGetMulti
+	memcacheSetMulti            = zeroMemcacheSetMulti
 
 	marshal   = marshalPropertyList
 	unmarshal = unmarshalPropertyList
@@ -47,14 +56,14 @@ var (
 // App Engine service is not called when there are no keys or items to be
 // called with. The datastore calls do not need this because they already check
 // for this condition and short-circuit.
-var memcacheAddMulti = func(c appengine.Context, items []*memcache.Item) error {
+func zeroMemcacheAddMulti(c appengine.Context, items []*memcache.Item) error {
 	if len(items) == 0 {
 		return nil
 	}
 	return memcache.AddMulti(c, items)
 }
 
-var memcacheCompareAndSwapMulti = func(c appengine.Context,
+func zeroMemcacheCompareAndSwapMulti(c appengine.Context,
 	items []*memcache.Item) error {
 	if len(items) == 0 {
 		return nil
@@ -62,7 +71,7 @@ var memcacheCompareAndSwapMulti = func(c appengine.Context,
 	return memcache.CompareAndSwapMulti(c, items)
 }
 
-var memcacheGetMulti = func(c appengine.Context, keys []string) (
+func zeroMemcacheGetMulti(c appengine.Context, keys []string) (
 	map[string]*memcache.Item, error) {
 	if len(keys) == 0 {
 		return make(map[string]*memcache.Item, 0), nil
@@ -70,14 +79,14 @@ var memcacheGetMulti = func(c appengine.Context, keys []string) (
 	return memcache.GetMulti(c, keys)
 }
 
-var memcacheDeleteMulti = func(c appengine.Context, keys []string) error {
+func zeroMemcacheDeleteMulti(c appengine.Context, keys []string) error {
 	if len(keys) == 0 {
 		return nil
 	}
 	return memcache.DeleteMulti(c, keys)
 }
 
-var memcacheSetMulti = func(c appengine.Context, items []*memcache.Item) error {
+func zeroMemcacheSetMulti(c appengine.Context, items []*memcache.Item) error {
 	if len(items) == 0 {
 		return nil
 	}

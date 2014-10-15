@@ -108,7 +108,7 @@ func TestDeleteMemcacheFail(t *testing.T) {
 	})
 
 	defer func() {
-		nds.SetMemcacheSetMulti(memcache.SetMulti)
+		nds.SetMemcacheSetMulti(nds.ZeroMemcacheSetMulti)
 	}()
 
 	if err := nds.DeleteMulti(c, keys); err == nil {

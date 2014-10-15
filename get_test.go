@@ -505,10 +505,10 @@ func TestGetMemcacheFail(t *testing.T) {
 	})
 
 	defer func() {
-		nds.SetMemcacheAddMulti(memcache.AddMulti)
-		nds.SetMemcacheCompareAndSwapMulti(memcache.CompareAndSwapMulti)
-		nds.SetMemcacheGetMulti(memcache.GetMulti)
-		nds.SetMemcacheSetMulti(memcache.SetMulti)
+		nds.SetMemcacheAddMulti(nds.ZeroMemcacheAddMulti)
+		nds.SetMemcacheCompareAndSwapMulti(nds.ZeroMemcacheCompareAndSwapMulti)
+		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+		nds.SetMemcacheSetMulti(nds.ZeroMemcacheSetMulti)
 	}()
 
 	retVal := &testEntity{}
@@ -597,7 +597,7 @@ func TestGetMultiMemcacheCorrupt(t *testing.T) {
 		return items, err
 	})
 	defer func() {
-		nds.SetMemcacheGetMulti(memcache.GetMulti)
+		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 	}()
 
 	// Get from datastore.
@@ -652,7 +652,7 @@ func TestGetMultiMemcacheFlagCorrupt(t *testing.T) {
 		return items, err
 	})
 	defer func() {
-		nds.SetMemcacheGetMulti(memcache.GetMulti)
+		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 	}()
 
 	// Get from datastore.
@@ -703,7 +703,7 @@ func TestGetMultiLockMemcacheFailure(t *testing.T) {
 		return items, err
 	})
 	defer func() {
-		nds.SetMemcacheGetMulti(memcache.GetMulti)
+		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 	}()
 
 	response := make([]testEntity, len(keys))

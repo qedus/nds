@@ -8,16 +8,26 @@ import (
 	"appengine/memcache"
 )
 
-var PropertyLoadSaverToPropertyList = propertyLoadSaverToPropertyList
+var (
+	PropertyLoadSaverToPropertyList = propertyLoadSaverToPropertyList
+
+	ZeroMemcacheAddMulti            = zeroMemcacheAddMulti
+	ZeroMemcacheCompareAndSwapMulti = zeroMemcacheCompareAndSwapMulti
+	ZeroMemcacheDeleteMulti         = zeroMemcacheDeleteMulti
+	ZeroMemcacheGetMulti            = zeroMemcacheGetMulti
+	ZeroMemcacheSetMulti            = zeroMemcacheSetMulti
+)
 
 func SetMemcacheAddMulti(f func(c appengine.Context,
 	items []*memcache.Item) error) {
 	memcacheAddMulti = f
 }
+
 func SetMemcacheCompareAndSwapMulti(f func(c appengine.Context,
 	items []*memcache.Item) error) {
 	memcacheCompareAndSwapMulti = f
 }
+
 func SetMemcacheDeleteMulti(f func(c appengine.Context, keys []string) error) {
 	memcacheDeleteMulti = f
 }
