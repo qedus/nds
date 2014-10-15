@@ -607,7 +607,7 @@ func TestGetMultiMemcacheCorrupt(t *testing.T) {
 	}
 	for i := 0; i < len(keys); i++ {
 		if entities[i].IntVal != response[i].IntVal {
-			t.Fatal("IntVal not equal")
+			t.Fatal("IntVal not equal", entities[i].IntVal, response[i].IntVal)
 		}
 	}
 }

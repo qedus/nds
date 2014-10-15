@@ -658,8 +658,11 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 		GeoPoint   appengine.GeoPoint
 	}{}
 
-	if err := nds.UnmarshalPropertyList(
-		reflect.ValueOf(testEntity), data); err != nil {
+	pl = datastore.PropertyList{}
+	if err := nds.UnmarshalPropertyList(data, &pl); err != nil {
+		t.Fatal(err)
+	}
+	if err := nds.SetValue(reflect.ValueOf(testEntity), pl); err != nil {
 		t.Fatal(err)
 	}
 

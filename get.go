@@ -220,11 +220,16 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 				cacheItems[i].state = done
 				cacheItems[i].err = datastore.ErrNoSuchEntity
 			case entityItem:
-				err := unmarshal(cacheItems[i].val, item.Value)
-				if err == nil {
+				pl := datastore.PropertyList{}
+				if err := unmarshal(item.Value, &pl); err != nil {
+					c.Warningf("nds:loadMemcache unmarshal %s", err)
+					cacheItems[i].state = externalLock
+					break
+				}
+				if err := setValue(cacheItems[i].val, pl); err == nil {
 					cacheItems[i].state = done
 				} else {
-					c.Warningf("nds:loadMemcache unmarshal %s", err)
+					c.Warningf("nds:loadMemcache setValue %s", err)
 					cacheItems[i].state = externalLock
 				}
 			default:
@@ -289,11 +294,16 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 					cacheItems[i].state = done
 					cacheItems[i].err = datastore.ErrNoSuchEntity
 				case entityItem:
-					err := unmarshal(cacheItems[i].val, item.Value)
-					if err == nil {
+					pl := datastore.PropertyList{}
+					if err := unmarshal(item.Value, &pl); err != nil {
+						c.Warningf("nds:lockMemcache unmarshal %s", err)
+						cacheItems[i].state = externalLock
+						break
+					}
+					if err := setValue(cacheItems[i].val, pl); err == nil {
 						cacheItems[i].state = done
 					} else {
-						c.Warningf("nds:lockMemcache unmarshal %s", err)
+						c.Warningf("nds:lockMemcache setValue %s", err)
 						cacheItems[i].state = externalLock
 					}
 				default:

@@ -221,12 +221,8 @@ func marshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func unmarshalPropertyList(val reflect.Value, data []byte) error {
-	pl := datastore.PropertyList{}
-	if err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(&pl); err != nil {
-		return err
-	}
-	return setValue(val, pl)
+func unmarshalPropertyList(data []byte, pl *datastore.PropertyList) error {
+	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(pl)
 }
 
 func setValue(val reflect.Value, pl datastore.PropertyList) error {

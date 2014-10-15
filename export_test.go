@@ -54,6 +54,10 @@ func MarshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
 	return marshalPropertyList(pl)
 }
 
-func UnmarshalPropertyList(val reflect.Value, data []byte) error {
-	return unmarshalPropertyList(val, data)
+func UnmarshalPropertyList(data []byte, pl *datastore.PropertyList) error {
+	return unmarshalPropertyList(data, pl)
+}
+
+func SetValue(val reflect.Value, pl datastore.PropertyList) error {
+	return setValue(val, pl)
 }
