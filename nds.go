@@ -35,12 +35,6 @@ var (
 var (
 	// The variables in this block are here so that we can test all error code
 	// paths by substituting the respective functions with error producing ones.
-	memcacheAddMulti            = memcache.AddMulti
-	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
-	memcacheGetMulti            = memcache.GetMulti
-	memcacheDeleteMulti         = memcache.DeleteMulti
-	memcacheSetMulti            = memcache.SetMulti
-
 	datastoreDeleteMulti = datastore.DeleteMulti
 	datastoreGetMulti    = datastore.GetMulti
 	datastorePutMulti    = datastore.PutMulti
@@ -48,6 +42,47 @@ var (
 	marshal   = marshalPropertyList
 	unmarshal = unmarshalPropertyList
 )
+
+// The following memcache functions are enclosed to ensure the underlying
+// App Engine service is not called when there are no keys or items to be
+// called with. The datastore calls do not need this because they already check
+// for this condition and short-circuit.
+var memcacheAddMulti = func(c appengine.Context, items []*memcache.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+	return memcache.AddMulti(c, items)
+}
+
+var memcacheCompareAndSwapMulti = func(c appengine.Context,
+	items []*memcache.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+	return memcache.CompareAndSwapMulti(c, items)
+}
+
+var memcacheGetMulti = func(c appengine.Context, keys []string) (
+	map[string]*memcache.Item, error) {
+	if len(keys) == 0 {
+		return make(map[string]*memcache.Item, 0), nil
+	}
+	return memcache.GetMulti(c, keys)
+}
+
+var memcacheDeleteMulti = func(c appengine.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	return memcache.DeleteMulti(c, keys)
+}
+
+var memcacheSetMulti = func(c appengine.Context, items []*memcache.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+	return memcache.SetMulti(c, items)
+}
 
 const (
 	noneItem uint32 = iota

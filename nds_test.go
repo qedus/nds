@@ -11,6 +11,7 @@ import (
 	"appengine"
 	"appengine/aetest"
 	"appengine/datastore"
+	"appengine/memcache"
 )
 
 func TestPutGetDelete(t *testing.T) {
@@ -21,14 +22,49 @@ func TestPutGetDelete(t *testing.T) {
 	defer c.Close()
 
 	type testEntity struct {
-		Val int
+		IntVal int
 	}
+
+	// Check we set memcahce, put datastore and delete memcache.
+	seq := make(chan string, 3)
+	nds.SetMemcacheSetMulti(func(c appengine.Context,
+		items []*memcache.Item) error {
+		seq <- "memcache.SetMulti"
+		return memcache.SetMulti(c, items)
+	})
+	nds.SetDatastorePutMulti(func(c appengine.Context,
+		keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
+		seq <- "datastore.PutMulti"
+		return datastore.PutMulti(c, keys, vals)
+	})
+	nds.SetMemcacheDeleteMulti(func(c appengine.Context,
+		keys []string) error {
+		seq <- "memcache.DeleteMulti"
+		close(seq)
+		return memcache.DeleteMulti(c, keys)
+	})
 
 	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
 	key, err := nds.Put(c, incompleteKey, &testEntity{43})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	nds.SetMemcacheSetMulti(memcache.SetMulti)
+	nds.SetDatastorePutMulti(datastore.PutMulti)
+	nds.SetMemcacheDeleteMulti(memcache.DeleteMulti)
+
+	if s := <-seq; s != "memcache.SetMulti" {
+		t.Fatal("memcache.SetMulti not", s)
+	}
+	if s := <-seq; s != "datastore.PutMulti" {
+		t.Fatal("datastore.PutMulti not", s)
+	}
+	if s := <-seq; s != "memcache.DeleteMulti" {
+		t.Fatal("memcache.DeleteMulti not", s)
+	}
+	// Check chan is closed.
+	<-seq
 
 	if key.Incomplete() {
 		t.Fatal("Key is incomplete")
@@ -39,8 +75,8 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if te.Val != 43 {
-		t.Fatal("te.Val != 43", te.Val)
+	if te.IntVal != 43 {
+		t.Fatal("te.Val != 43", te.IntVal)
 	}
 
 	// Get from cache.
@@ -49,8 +85,8 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if te.Val != 43 {
-		t.Fatal("te.Val != 43", te.Val)
+	if te.IntVal != 43 {
+		t.Fatal("te.Val != 43", te.IntVal)
 	}
 
 	// Change value.
@@ -64,8 +100,8 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if te.Val != 64 {
-		t.Fatal("te.Val != 64", te.Val)
+	if te.IntVal != 64 {
+		t.Fatal("te.Val != 64", te.IntVal)
 	}
 
 	if err := nds.Delete(c, key); err != nil {
