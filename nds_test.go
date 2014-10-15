@@ -686,3 +686,17 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 		t.Fatal("geoPointVal not equal")
 	}
 }
+
+func TestMartialPropertyListError(t *testing.T) {
+
+	type testEntity struct {
+		IntVal int
+	}
+
+	pl := datastore.PropertyList{
+		datastore.Property{"Prop", &testEntity{3}, false, false},
+	}
+	if _, err := nds.MarshalPropertyList(pl); err == nil {
+		t.Fatal("expected error")
+	}
+}

@@ -115,3 +115,16 @@ func TestDeleteMemcacheFail(t *testing.T) {
 		t.Fatal("expected DeleteMulti error")
 	}
 }
+
+// TestDeleteMemcacheZeroKeys is here to exercise the zero keys code path.
+func TestDeleteMemcacheZeroKeys(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if err := nds.DeleteMulti(c, []*datastore.Key{}); err != nil {
+		t.Fatal(err)
+	}
+}
