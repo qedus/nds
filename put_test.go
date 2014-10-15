@@ -165,3 +165,16 @@ func TestPutDatastoreMultiError(t *testing.T) {
 		t.Fatal("should be expectedErr")
 	}
 }
+
+func TestPutMultiZeroKeys(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if _, err := nds.PutMulti(c, []*datastore.Key{},
+		[]interface{}{}); err != nil {
+		t.Fatal(err)
+	}
+}
