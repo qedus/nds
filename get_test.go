@@ -704,11 +704,11 @@ func TestGetMultiLockMemcacheFail(t *testing.T) {
 		f := <-memcacheGetChan
 		return f(c, keys)
 	})
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 	response := make([]testEntity, len(keys))
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
-	nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 
 	for i := 0; i < len(keys); i++ {
 		if entities[i].IntVal != response[i].IntVal {
@@ -757,11 +757,11 @@ func TestGetMultiLockItemValueFail(t *testing.T) {
 		f := <-memcacheGetChan
 		return f(c, keys)
 	})
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 	response := make([]testEntity, len(keys))
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
-	nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 
 	for i := 0; i < len(keys); i++ {
 		if entities[i].IntVal != response[i].IntVal {
@@ -810,6 +810,7 @@ func TestGetMultiLockItemNoneFlags(t *testing.T) {
 		f := <-memcacheGetChan
 		return f(c, keys)
 	})
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 	response := make([]testEntity, len(keys))
 	if err := nds.GetMulti(c, keys, response); err == nil {
 		t.Fatal("expected error")
