@@ -545,9 +545,7 @@ func TestGetMultiDatastoreFail(t *testing.T) {
 		keys []*datastore.Key, vals interface{}) error {
 		return errors.New("expected datastore.GetMulti error")
 	})
-	defer func() {
-		nds.SetDatastoreGetMulti(datastore.GetMulti)
-	}()
+	defer nds.SetDatastoreGetMulti(datastore.GetMulti)
 
 	// Get from datastore.
 	response := make([]testEntity, len(keys))
@@ -595,9 +593,7 @@ func TestGetMultiMemcacheCorrupt(t *testing.T) {
 
 		return items, err
 	})
-	defer func() {
-		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
-	}()
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 
 	// Get from datastore.
 	response := make([]testEntity, len(keys))
@@ -650,9 +646,7 @@ func TestGetMultiMemcacheFlagCorrupt(t *testing.T) {
 
 		return items, err
 	})
-	defer func() {
-		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
-	}()
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
 
 	// Get from datastore.
 	response := make([]testEntity, len(keys))
