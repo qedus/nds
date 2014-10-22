@@ -811,6 +811,7 @@ func TestGetMultiLockItemNoneFlags(t *testing.T) {
 		return f(c, keys)
 	})
 	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+
 	response := make([]testEntity, len(keys))
 	if err := nds.GetMulti(c, keys, response); err == nil {
 		t.Fatal("expected error")
@@ -821,6 +822,244 @@ func TestGetMultiLockItemNoneFlags(t *testing.T) {
 			if e != datastore.ErrNoSuchEntity {
 				t.Fatal("expected datastore.ErrNoSuchEntity")
 			}
+		}
+	}
+}
+
+func TestGetMultiLockReturnEntityFail(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fail to unmarshal test.
+	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+		map[string]*memcache.Item, error), 2)
+	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		if err != nil {
+			return nil, err
+		}
+		items[keys[0]].Flags = nds.EntityItem
+		items[keys[1]].Flags = nds.EntityItem
+		return items, nil
+	}
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		f := <-memcacheGetChan
+		return f(c, keys)
+	})
+
+	response := make([]testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+
+	for i := 0; i < len(keys); i++ {
+		if entities[i].IntVal != response[i].IntVal {
+			t.Fatal("IntVal not equal")
+		}
+	}
+}
+
+func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fail to unmarshal test.
+	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+		map[string]*memcache.Item, error), 2)
+	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		if err != nil {
+			return nil, err
+		}
+		pl := datastore.PropertyList{
+			datastore.Property{"One", 1, false, false},
+		}
+		value, err := nds.MarshalPropertyList(pl)
+		if err != nil {
+			return nil, err
+		}
+		items[keys[0]].Flags = nds.EntityItem
+		items[keys[0]].Value = value
+		items[keys[1]].Flags = nds.EntityItem
+		items[keys[1]].Value = value
+		return items, nil
+	}
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		f := <-memcacheGetChan
+		return f(c, keys)
+	})
+
+	response := make([]testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+
+	for i := 0; i < len(keys); i++ {
+		if entities[i].IntVal != response[i].IntVal {
+			t.Fatal("IntVal not equal")
+		}
+	}
+}
+
+func TestGetMultiLockReturnEntity(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+		map[string]*memcache.Item, error), 2)
+	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		if err != nil {
+			return nil, err
+		}
+		pl := datastore.PropertyList{
+			datastore.Property{"IntVal", int64(5), false, false},
+		}
+		value, err := nds.MarshalPropertyList(pl)
+		if err != nil {
+			return nil, err
+		}
+		items[keys[0]].Flags = nds.EntityItem
+		items[keys[0]].Value = value
+		items[keys[1]].Flags = nds.EntityItem
+		items[keys[1]].Value = value
+		return items, nil
+	}
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		f := <-memcacheGetChan
+		return f(c, keys)
+	})
+
+	response := make([]testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+
+	for i := 0; i < len(keys); i++ {
+		if 5 != response[i].IntVal {
+			t.Fatal("IntVal not equal")
+		}
+	}
+}
+
+func TestGetMultiLockReturnUnknown(t *testing.T) {
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+		map[string]*memcache.Item, error), 2)
+	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		if err != nil {
+			return nil, err
+		}
+
+		// Unknown lock values.
+		items[keys[0]].Flags = 23
+		items[keys[1]].Flags = 24
+		return items, nil
+	}
+	nds.SetMemcacheGetMulti(func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error) {
+		f := <-memcacheGetChan
+		return f(c, keys)
+	})
+
+	response := make([]testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+
+	for i := 0; i < len(keys); i++ {
+		if entities[i].IntVal != response[i].IntVal {
+			t.Fatal("IntVal not equal")
 		}
 	}
 }

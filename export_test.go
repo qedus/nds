@@ -17,7 +17,8 @@ var (
 	ZeroMemcacheGetMulti            = zeroMemcacheGetMulti
 	ZeroMemcacheSetMulti            = zeroMemcacheSetMulti
 
-	NoneItem = noneItem
+	NoneItem   = noneItem
+	EntityItem = entityItem
 )
 
 func SetMemcacheAddMulti(f func(c appengine.Context,
