@@ -12,7 +12,7 @@ One other benefit is that the standard `datastore.GetMulti` function only allows
 
 ## How To Use
 
-You can use this package in *exactly* the same way you would use `appengine/datastore`. However, it is important that you use `nds.Get*`, `nds.Put*` and `nds.Delete*` entirely within your code and do not mix use of those functions between `appengine/datastore` and `github.com/qedus/nds` within your app as you will be liable to get stale datastore entities as `github.com/qedus/nds` goes to great lengths to keep caches in sync with the datastore.
+You can use this package in *exactly* the same way you would use `appengine/datastore`. However, it is important that you use `nds.Get*`, `nds.Put*`, `nds.Delete*` and `nds.RunInTransaction` entirely within your code. Do not mix use of those functions with the `appengine/datastore` equivalents as you will be liable to get stale datastore entities from `github.com/qedus/nds`.
 
 Ultimately all you need to do is find/replace the following in your codebase:
 
