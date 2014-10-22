@@ -17,6 +17,9 @@ var (
 	ZeroMemcacheGetMulti            = zeroMemcacheGetMulti
 	ZeroMemcacheSetMulti            = zeroMemcacheSetMulti
 
+	MarshalPropertyList   = marshalPropertyList
+	UnmarshalPropertyList = unmarshalPropertyList
+
 	NoneItem   = noneItem
 	EntityItem = entityItem
 )
@@ -63,12 +66,12 @@ func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
 	return loadStruct(dst, pl)
 }
 
-func MarshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
-	return marshalPropertyList(pl)
+func SetMarshal(f func(pl datastore.PropertyList) ([]byte, error)) {
+	marshal = f
 }
 
-func UnmarshalPropertyList(data []byte, pl *datastore.PropertyList) error {
-	return unmarshalPropertyList(data, pl)
+func SetUnmarshal(f func(data []byte, pl *datastore.PropertyList) error) {
+	unmarshal = f
 }
 
 func SetValue(val reflect.Value, pl datastore.PropertyList) error {
