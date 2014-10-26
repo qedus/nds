@@ -15,7 +15,7 @@ func inTransaction(c appengine.Context) bool {
 }
 
 // RunInTransaction works just like datastore.RunInTransaction however it
-// interacts correcly with memcache. You should always use this method for
+// interacts correctly with memcache. You should always use this method for
 // transactions if you are using the NDS package.
 func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	opts *datastore.TransactionOptions) error {
