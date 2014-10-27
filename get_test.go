@@ -1113,54 +1113,6 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 	}
 }
 
-func TestGetMultiDatastoreUnknownMultiError(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
-	type testEntity struct {
-		IntVal int64
-	}
-
-	keys := []*datastore.Key{}
-	entities := []testEntity{}
-	for i := int64(1); i < 3; i++ {
-		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
-		entities = append(entities, testEntity{i})
-	}
-
-	if _, err := nds.PutMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	expectedErr := errors.New("expected unknown error")
-	nds.SetDatastoreGetMulti(func(c appengine.Context,
-		keys []*datastore.Key, vals interface{}) error {
-
-		me := make(appengine.MultiError, len(keys))
-		for i := range me {
-			me[i] = expectedErr
-		}
-		return me
-	})
-
-	response := make([]testEntity, len(keys))
-	if err := nds.GetMulti(c, keys, response); err == nil {
-		t.Fatal("expected appengine.MultiError")
-	} else if me, ok := err.(appengine.MultiError); !ok {
-		t.Fatal("expected appengine.MultiError")
-	} else {
-		for _, e := range me {
-			if e != expectedErr {
-				t.Fatal("expected specific error")
-			}
-		}
-	}
-	nds.SetDatastoreGetMulti(datastore.GetMulti)
-}
-
 func TestGetMultiDatastoreMarshalFail(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
@@ -1197,5 +1149,167 @@ func TestGetMultiDatastoreMarshalFail(t *testing.T) {
 		if entities[i].IntVal != response[i].IntVal {
 			t.Fatal("IntVal not equal")
 		}
+	}
+}
+
+func TestGetMultiPaths(t *testing.T) {
+
+	type memcacheGetMultiFunc func(c appengine.Context,
+		keys []string) (map[string]*memcache.Item, error)
+
+	type memcacheAddMultiFunc func(c appengine.Context,
+		items []*memcache.Item) error
+
+	type memcacheCompareAndSwapMultiFunc func(c appengine.Context,
+		items []*memcache.Item) error
+
+	type datastoreGetMultiFunc func(c appengine.Context,
+		keys []*datastore.Key, vals interface{}) error
+
+	expectedErr := errors.New("expected error")
+
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keysVals := func(c appengine.Context, count int64) (
+		[]*datastore.Key, []testEntity) {
+
+		keys, vals := make([]*datastore.Key, count), make([]testEntity, count)
+		for i := int64(0); i < count; i++ {
+			keys[i] = datastore.NewKey(c, "Entity", "", i+1, nil)
+			vals[i] = testEntity{i + 1}
+		}
+		return keys, vals
+	}
+
+	tests := []struct {
+		description string
+
+		count int64
+
+		memcacheGetMultis           [2]memcacheGetMultiFunc
+		memcacheAddMulti            memcacheAddMultiFunc
+		memcacheCompareAndSwapMulti memcacheCompareAndSwapMultiFunc
+
+		datastoreGetMulti datastoreGetMultiFunc
+
+		expectedErr error
+	}{
+		{
+			"no errors",
+			20,
+			[2]memcacheGetMultiFunc{
+				nds.ZeroMemcacheGetMulti,
+				nds.ZeroMemcacheGetMulti,
+			},
+			nds.ZeroMemcacheAddMulti,
+			nds.ZeroMemcacheCompareAndSwapMulti,
+			datastore.GetMulti,
+
+			nil,
+		},
+		{
+			"datastore unknown multierror",
+			2,
+			[2]memcacheGetMultiFunc{
+				nds.ZeroMemcacheGetMulti,
+				nds.ZeroMemcacheGetMulti,
+			},
+			nds.ZeroMemcacheAddMulti,
+			nds.ZeroMemcacheCompareAndSwapMulti,
+			func(c appengine.Context,
+				keys []*datastore.Key, vals interface{}) error {
+
+				me := make(appengine.MultiError, len(keys))
+				for i := range me {
+					me[i] = expectedErr
+				}
+				return me
+			},
+
+			appengine.MultiError{expectedErr, expectedErr},
+		},
+	}
+
+	for _, test := range tests {
+		t.Log("Start", test.description)
+
+		keys, putVals := keysVals(c, test.count)
+		if _, err := nds.PutMulti(c, keys, putVals); err != nil {
+			t.Fatal(err)
+		}
+
+		memcacheGetChan := make(chan memcacheGetMultiFunc,
+			len(test.memcacheGetMultis))
+
+		for _, fn := range test.memcacheGetMultis {
+			memcacheGetChan <- fn
+		}
+
+		nds.SetMemcacheGetMulti(func(c appengine.Context, keys []string) (
+			map[string]*memcache.Item, error) {
+			fn := <-memcacheGetChan
+			return fn(c, keys)
+		})
+
+		nds.SetMemcacheAddMulti(test.memcacheAddMulti)
+		nds.SetMemcacheCompareAndSwapMulti(test.memcacheCompareAndSwapMulti)
+
+		nds.SetDatastoreGetMulti(test.datastoreGetMulti)
+
+		getVals := make([]testEntity, test.count)
+		err := nds.GetMulti(c, keys, getVals)
+
+		// Reset App Engine API calls.
+		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+		nds.SetMemcacheAddMulti(nds.ZeroMemcacheAddMulti)
+		nds.SetMemcacheCompareAndSwapMulti(nds.ZeroMemcacheCompareAndSwapMulti)
+		nds.SetDatastoreGetMulti(datastore.GetMulti)
+
+		if test.expectedErr == nil {
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for i := range getVals {
+				if getVals[i].IntVal != putVals[i].IntVal {
+					t.Fatal("incorrect IntVal")
+				}
+			}
+		} else {
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			expectedMultiErr, isMultiErr := test.expectedErr.(appengine.MultiError)
+
+			if isMultiErr {
+				me, ok := err.(appengine.MultiError)
+				if !ok {
+					t.Fatal("expected appengine.MultiError but got", err)
+				}
+
+				if len(me) != len(expectedMultiErr) {
+					t.Fatal("appengine.MultiError length incorrect")
+				}
+
+				for i, e := range me {
+					if e != expectedMultiErr[i] {
+						t.Fatal("non matching errors", e, expectedMultiErr[i])
+					}
+				}
+			}
+		}
+
+		if err := nds.DeleteMulti(c, keys); err != nil {
+			t.Fatal(err)
+		}
+		t.Log("End", test.description)
 	}
 }
