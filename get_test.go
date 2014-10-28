@@ -466,59 +466,6 @@ func TestGetMultiNonStruct(t *testing.T) {
 	}
 }
 
-func TestGetMultiLockItemValueFail(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
-	type testEntity struct {
-		IntVal int64
-	}
-
-	keys := []*datastore.Key{}
-	entities := []testEntity{}
-	for i := int64(1); i < 3; i++ {
-		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
-		entities = append(entities, testEntity{i})
-	}
-
-	if _, err := nds.PutMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
-		map[string]*memcache.Item, error), 2)
-	memcacheGetChan <- nds.ZeroMemcacheGetMulti
-	memcacheGetChan <- func(c appengine.Context,
-		keys []string) (map[string]*memcache.Item, error) {
-		items, err := nds.ZeroMemcacheGetMulti(c, keys)
-		if err != nil {
-			return nil, err
-		}
-		items[keys[0]].Value = []byte("random1")
-		items[keys[1]].Value = []byte("random2")
-		return items, nil
-	}
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
-		keys []string) (map[string]*memcache.Item, error) {
-		f := <-memcacheGetChan
-		return f(c, keys)
-	})
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
-	response := make([]testEntity, len(keys))
-	if err := nds.GetMulti(c, keys, response); err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < len(keys); i++ {
-		if entities[i].IntVal != response[i].IntVal {
-			t.Fatal("IntVal not equal")
-		}
-	}
-}
-
 func TestGetMultiLockItemNoneFlags(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
@@ -1135,6 +1082,32 @@ func TestGetMultiPaths(t *testing.T) {
 				nds.UnmarshalPropertyList,
 			},
 			[]error{nil, nil},
+		},
+		{
+			"lock memcache value fail",
+			20,
+			1,
+			[]memcacheGetMultiFunc{
+				nds.ZeroMemcacheGetMulti,
+				func(c appengine.Context, keys []string) (
+					map[string]*memcache.Item, error) {
+					items, err := memcache.GetMulti(c, keys)
+					// Corrupt flags with unknown number.
+					for _, item := range items {
+						item.Value = []byte("corrupt value")
+					}
+					return items, err
+				},
+			},
+			nds.ZeroMemcacheAddMulti,
+			nds.ZeroMemcacheCompareAndSwapMulti,
+			datastore.GetMulti,
+			nds.MarshalPropertyList,
+			[]unmarshalFunc{
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+			},
+			[]error{nil},
 		},
 	}
 
