@@ -1236,26 +1236,32 @@ func TestGetMultiPaths(t *testing.T) {
 						t.Fatal("incorrect IntVal")
 					}
 				}
-			} else {
-				if err == nil {
-					t.Fatal("expected error")
+				continue
+			}
+
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			expectedMultiErr, isMultiErr := expectedErr.(appengine.MultiError)
+
+			if isMultiErr {
+				me, ok := err.(appengine.MultiError)
+				if !ok {
+					t.Fatal("expected appengine.MultiError but got", err)
 				}
-				expectedMultiErr, isMultiErr := expectedErr.(appengine.MultiError)
 
-				if isMultiErr {
-					me, ok := err.(appengine.MultiError)
-					if !ok {
-						t.Fatal("expected appengine.MultiError but got", err)
+				if len(me) != len(expectedMultiErr) {
+					t.Fatal("appengine.MultiError length incorrect")
+				}
+
+				for i, e := range me {
+					if e != expectedMultiErr[i] {
+						t.Fatal("non matching errors", e, expectedMultiErr[i])
 					}
 
-					if len(me) != len(expectedMultiErr) {
-						t.Fatal("appengine.MultiError length incorrect")
-					}
-
-					for i, e := range me {
-						if e != expectedMultiErr[i] {
-							t.Fatal("non matching errors",
-								e, expectedMultiErr[i])
+					if e == nil {
+						if getVals[i].IntVal != putVals[i].IntVal {
+							t.Fatal("incorrect IntVal")
 						}
 					}
 				}
