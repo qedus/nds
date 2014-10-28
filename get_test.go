@@ -466,112 +466,6 @@ func TestGetMultiNonStruct(t *testing.T) {
 	}
 }
 
-func TestGetMultiMemcacheCorrupt(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
-	type testEntity struct {
-		IntVal int64
-	}
-
-	keys := []*datastore.Key{}
-	entities := []testEntity{}
-	for i := int64(1); i < 3; i++ {
-		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
-		entities = append(entities, testEntity{i})
-	}
-
-	if _, err := nds.PutMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	// Charge memcache.
-	if err := nds.GetMulti(c, keys, make([]testEntity, len(keys))); err != nil {
-		t.Fatal(err)
-	}
-
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
-		keys []string) (map[string]*memcache.Item, error) {
-		items, err := memcache.GetMulti(c, keys)
-
-		// Skip over lockMemcaheKeys GetMulti.
-		if len(keys) != 0 {
-			// Corrupt second item.
-			items[keys[1]].Value = []byte("corrupt string")
-		}
-
-		return items, err
-	})
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
-
-	// Get from datastore.
-	response := make([]testEntity, len(keys))
-	if err := nds.GetMulti(c, keys, response); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < len(keys); i++ {
-		if entities[i].IntVal != response[i].IntVal {
-			t.Fatal("IntVal not equal", entities[i].IntVal, response[i].IntVal)
-		}
-	}
-}
-
-func TestGetMultiMemcacheFlagCorrupt(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-
-	type testEntity struct {
-		IntVal int64
-	}
-
-	keys := []*datastore.Key{}
-	entities := []testEntity{}
-	for i := int64(1); i < 3; i++ {
-		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
-		entities = append(entities, testEntity{i})
-	}
-
-	if _, err := nds.PutMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	// Charge memcache.
-	if err := nds.GetMulti(c, keys, make([]testEntity, len(keys))); err != nil {
-		t.Fatal(err)
-	}
-
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
-		keys []string) (map[string]*memcache.Item, error) {
-		items, err := memcache.GetMulti(c, keys)
-
-		// Skip over lockMemcaheKeys GetMulti.
-		if len(keys) != 0 {
-			// Corrupt second item.
-			items[keys[1]].Flags = 56
-		}
-
-		return items, err
-	})
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
-
-	// Get from datastore.
-	response := make([]testEntity, len(keys))
-	if err := nds.GetMulti(c, keys, response); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < len(keys); i++ {
-		if entities[i].IntVal != response[i].IntVal {
-			t.Fatal("IntVal not equal")
-		}
-	}
-}
-
 func TestGetMultiLockItemValueFail(t *testing.T) {
 	c, err := aetest.NewContext(nil)
 	if err != nil {
@@ -1177,6 +1071,70 @@ func TestGetMultiPaths(t *testing.T) {
 				nds.UnmarshalPropertyList,
 			},
 			[]error{nil},
+		},
+		{
+			"memcache corrupt",
+			2,
+			2,
+			[]memcacheGetMultiFunc{
+				// Charge memcache.
+				nds.ZeroMemcacheGetMulti,
+				nds.ZeroMemcacheGetMulti,
+				// Corrupt memcache.
+				func(c appengine.Context, keys []string) (
+					map[string]*memcache.Item, error) {
+					items, err := memcache.GetMulti(c, keys)
+					// Corrupt items.
+					for _, item := range items {
+						item.Value = []byte("corrupt string")
+					}
+					return items, err
+				},
+				nds.ZeroMemcacheGetMulti,
+			},
+			nds.ZeroMemcacheAddMulti,
+			nds.ZeroMemcacheCompareAndSwapMulti,
+			datastore.GetMulti,
+			nds.MarshalPropertyList,
+			[]unmarshalFunc{
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+			},
+			[]error{nil, nil},
+		},
+		{
+			"memcache flag corrupt",
+			2,
+			2,
+			[]memcacheGetMultiFunc{
+				// Charge memcache.
+				nds.ZeroMemcacheGetMulti,
+				nds.ZeroMemcacheGetMulti,
+				// Corrupt memcache flags.
+				func(c appengine.Context, keys []string) (
+					map[string]*memcache.Item, error) {
+					items, err := memcache.GetMulti(c, keys)
+					// Corrupt flags with unknown number.
+					for _, item := range items {
+						item.Flags = 56
+					}
+					return items, err
+				},
+				nds.ZeroMemcacheGetMulti,
+			},
+			nds.ZeroMemcacheAddMulti,
+			nds.ZeroMemcacheCompareAndSwapMulti,
+			datastore.GetMulti,
+			nds.MarshalPropertyList,
+			[]unmarshalFunc{
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+				nds.UnmarshalPropertyList,
+			},
+			[]error{nil, nil},
 		},
 	}
 
