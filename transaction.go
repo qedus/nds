@@ -3,10 +3,12 @@ package nds
 import (
 	"appengine"
 	"appengine/datastore"
+	"appengine/memcache"
 )
 
 type txContext struct {
 	appengine.Context
+	lockMemcacheItems []*memcache.Item
 }
 
 func inTransaction(c appengine.Context) bool {
@@ -24,6 +26,9 @@ func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 		txc := txContext{
 			Context: tc,
 		}
-		return f(txc)
+		if err := f(txc); err != nil {
+			return err
+		}
+		return memcacheSetMulti(c, txc.lockMemcacheItems)
 	}, opts)
 }
