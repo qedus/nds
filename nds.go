@@ -113,29 +113,6 @@ func itemLock() []byte {
 	return b
 }
 
-func checkArgs(key *datastore.Key, val interface{}) error {
-	if key == nil {
-		return errors.New("nds: key is nil")
-	}
-
-	if val == nil {
-		return errors.New("nds: val is nil")
-	}
-
-	v := reflect.ValueOf(val)
-	if v.Type() == typeOfPropertyList {
-		return errors.New("nds: PropertyList not supported")
-	}
-
-	switch v.Kind() {
-	case reflect.Ptr:
-		return nil
-	default:
-		return errors.New("nds: val must be a slice or pointer")
-	}
-
-}
-
 func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 	if v.Kind() != reflect.Slice {
 		return errors.New("nds: vals is not a slice")
@@ -143,6 +120,17 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 
 	if len(keys) != v.Len() {
 		return errors.New("nds: keys and vals slices have different length")
+	}
+
+	isNilErr, nilErr := false, make(appengine.MultiError, len(keys))
+	for i, key := range keys {
+		if key == nil {
+			isNilErr = true
+			nilErr[i] = datastore.ErrInvalidKey
+		}
+	}
+	if isNilErr {
+		return nilErr
 	}
 
 	if v.Type() == typeOfPropertyList {

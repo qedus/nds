@@ -121,12 +121,7 @@ func GetMulti(c appengine.Context,
 // val is a struct pointer.
 func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
 
-	if err := checkArgs(key, val); err != nil {
-		return err
-	}
-
-	vals := reflect.ValueOf([]interface{}{val})
-	err := getMulti(c, []*datastore.Key{key}, vals)
+	err := GetMulti(c, []*datastore.Key{key}, []interface{}{val})
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
 	}

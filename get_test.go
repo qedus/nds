@@ -200,7 +200,7 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Prime the cache..
+	// Prime the cache.
 	uncachedEntities := make([]datastore.PropertyList, len(keys))
 	if err := nds.GetMulti(c, keys, uncachedEntities); err != nil {
 		t.Fatal(err)

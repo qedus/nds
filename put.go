@@ -32,14 +32,13 @@ func PutMulti(c appengine.Context,
 func Put(c appengine.Context,
 	key *datastore.Key, val interface{}) (*datastore.Key, error) {
 
-	if err := checkArgs(key, val); err != nil {
-		return nil, err
-	}
-
-	keys, err := putMulti(c, []*datastore.Key{key}, []interface{}{val})
-	if me, ok := err.(appengine.MultiError); ok {
-		return nil, me[0]
-	} else if err != nil {
+	keys, err := PutMulti(c, []*datastore.Key{key}, []interface{}{val})
+	switch e := err.(type) {
+	case nil:
+		return keys[0], nil
+	case appengine.MultiError:
+		return nil, e[0]
+	default:
 		return nil, err
 	}
 	return keys[0], nil
