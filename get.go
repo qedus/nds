@@ -155,6 +155,17 @@ type cacheItem struct {
 	state cacheState
 }
 
+func makeCacheItems(keys []*datastore.Key, vals reflect.Value) []cacheItem {
+	cacheItems := make([]cacheItem, len(keys))
+	for i, key := range keys {
+		cacheItems[i].key = key
+		cacheItems[i].memcacheKey = createMemcacheKey(key)
+		cacheItems[i].val = vals.Index(i)
+		cacheItems[i].state = miss
+	}
+	return cacheItems
+}
+
 // getMulti attempts to get entities from, memcache, then the datastore.
 // datastore. It also tries to replenish memcache if needed available. It does
 // this in such a way that GetMulti will never get stale results even if the
@@ -164,13 +175,7 @@ type cacheItem struct {
 func getMulti(c appengine.Context,
 	keys []*datastore.Key, vals reflect.Value) error {
 
-	cacheItems := make([]cacheItem, len(keys))
-	for i, key := range keys {
-		cacheItems[i].key = key
-		cacheItems[i].memcacheKey = createMemcacheKey(key)
-		cacheItems[i].val = vals.Index(i)
-		cacheItems[i].state = miss
-	}
+	cacheItems := makeCacheItems(keys, vals)
 
 	loadMemcache(c, cacheItems)
 
@@ -182,6 +187,10 @@ func getMulti(c appengine.Context,
 
 	saveMemcache(c, cacheItems)
 
+	return handleMemcacheErrors(cacheItems)
+}
+
+func handleMemcacheErrors(cacheItems []cacheItem) error {
 	me, errsNil := make(appengine.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {
 		if cacheItem.err != nil {
