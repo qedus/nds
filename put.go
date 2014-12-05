@@ -12,9 +12,8 @@ import (
 // of entities that can be put by the datastore.PutMulti at once.
 const putMultiLimit = 500
 
-// PutMulti works just like datastore.PutMulti except it interacts
-// appropriately with NDS's caching strategy.
-// vals can only be slices of structs, []S.
+// PutMulti is a batch version of Put. It works just like datastore.PutMulti
+// except it interacts appropriately with NDS's caching strategy.
 func PutMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 

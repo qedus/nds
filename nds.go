@@ -158,9 +158,9 @@ func createMemcacheKey(key *datastore.Key) string {
 	return memcachePrefix + key.Encode()
 }
 
-// saveStruct saves src to a datastore.PropertyList. src must be a struct
+// SaveStruct saves src to a datastore.PropertyList. src must be a struct
 // pointer.
-func saveStruct(src interface{}, pl *datastore.PropertyList) error {
+func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
 	c, err := make(chan datastore.Property), make(chan error)
 	go func() {
 		err <- datastore.SaveStruct(src, c)
@@ -171,9 +171,9 @@ func saveStruct(src interface{}, pl *datastore.PropertyList) error {
 	return <-err
 }
 
-// loadStruct loads a datastore.PropertyList into dst. src must be a struct
+// LoadStruct loads a datastore.PropertyList into dst. dst must be a struct
 // pointer.
-func loadStruct(dst interface{}, pl datastore.PropertyList) error {
+func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
 	c := make(chan datastore.Property)
 	go func() {
 		for _, p := range pl {
@@ -235,5 +235,5 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 	if val.Kind() == reflect.Struct {
 		val = val.Addr()
 	}
-	return loadStruct(val.Interface(), pl)
+	return LoadStruct(val.Interface(), pl)
 }

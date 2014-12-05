@@ -58,14 +58,6 @@ func SetDatastoreGetMulti(f func(c appengine.Context,
 	datastoreGetMulti = f
 }
 
-func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
-	return saveStruct(src, pl)
-}
-
-func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
-	return loadStruct(dst, pl)
-}
-
 func SetMarshal(f func(pl datastore.PropertyList) ([]byte, error)) {
 	marshal = f
 }

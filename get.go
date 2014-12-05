@@ -40,6 +40,15 @@ const getMultiLimit = 1000
 // Increase the datastore timeout if you get datastore_v3: TIMEOUT errors when
 // getting thousands of entities. You can do this using
 // http://godoc.org/code.google.com/p/appengine-go/appengine#Timeout.
+//
+// vals must be a []S, []*S, []I or []P, for some struct type S, some interface
+// type I, or some non-interface non-pointer type P such that P or *P implements
+// datastore.PropertyLoadSaver. If an []I, each element must be a valid dst for
+// Get: it must be a struct pointer or implement datastore.PropertyLoadSaver.
+//
+// As a special case, datastore.PropertyList is an invalid type for dst, even
+// though a PropertyList is a slice of structs. It is treated as invalid to
+// avoid being mistakenly passed when []datastore.PropertyList was intended.
 func GetMulti(c appengine.Context,
 	keys []*datastore.Key, vals interface{}) error {
 
