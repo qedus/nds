@@ -23,12 +23,12 @@ func RunInTransaction(c appengine.Context, f func(tc appengine.Context) error,
 	opts *datastore.TransactionOptions) error {
 
 	return datastore.RunInTransaction(c, func(tc appengine.Context) error {
-		txc := txContext{
+		txc := &txContext{
 			Context: tc,
 		}
 		if err := f(txc); err != nil {
 			return err
 		}
-		return memcacheSetMulti(c, txc.lockMemcacheItems)
+		return memcacheSetMulti(tc, txc.lockMemcacheItems)
 	}, opts)
 }
