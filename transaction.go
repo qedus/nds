@@ -11,9 +11,9 @@ type txContext struct {
 	lockMemcacheItems []*memcache.Item
 }
 
-func inTransaction(c appengine.Context) bool {
-	_, ok := c.(txContext)
-	return ok
+func transactionContext(c appengine.Context) (*txContext, bool) {
+    txc, ok := c.(*txContext)
+    return txc, ok
 }
 
 // RunInTransaction works just like datastore.RunInTransaction however it

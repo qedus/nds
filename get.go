@@ -78,7 +78,7 @@ func GetMulti(c appengine.Context,
 		valSlice := v.Slice(lo, hi)
 
 		go func() {
-			if inTransaction(c) {
+            if _, ok :=  transactionContext(c); ok {
 				errs[index] = datastoreGetMulti(c,
 					keySlice, valSlice.Interface())
 			} else {

@@ -41,7 +41,7 @@ func deleteMulti(c appengine.Context, keys []*datastore.Key) error {
 	}
 
 	// Make sure we can lock memcache with no errors before deleting.
-	if txc, ok := c.(txContext); ok {
+	if txc, ok := transactionContext(c); ok {
 		txc.lockMemcacheItems = append(txc.lockMemcacheItems,
 			lockMemcacheItems...)
 	} else if err := memcacheSetMulti(c, lockMemcacheItems); err != nil {

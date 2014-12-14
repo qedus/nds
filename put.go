@@ -40,7 +40,6 @@ func Put(c appengine.Context,
 	default:
 		return nil, err
 	}
-	return keys[0], nil
 }
 
 // putMulti puts the entities into the datastore and then its local cache.
@@ -75,7 +74,7 @@ func putMulti(c appengine.Context,
 		return nil, err
 	}
 
-	if !inTransaction(c) {
+    if _, ok := transactionContext(c); !ok {
 		// Remove the locks.
 		if err := memcacheDeleteMulti(c, lockMemcacheKeys); err != nil {
 			c.Warningf("putMulti memcache.DeleteMulti %s", err)
