@@ -61,7 +61,7 @@ func putMulti(c appengine.Context,
 		}
 	}
 
-	if txc, ok := c.(txContext); ok {
+	if txc, ok := transactionContext(c); ok {
 		txc.lockMemcacheItems = append(txc.lockMemcacheItems,
 			lockMemcacheItems...)
 	} else if err := memcacheSetMulti(c, lockMemcacheItems); err != nil {
