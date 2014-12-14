@@ -74,7 +74,7 @@ func putMulti(c appengine.Context,
 		return nil, err
 	}
 
-    if _, ok := transactionContext(c); !ok {
+	if _, ok := transactionContext(c); !ok {
 		// Remove the locks.
 		if err := memcacheDeleteMulti(c, lockMemcacheKeys); err != nil {
 			c.Warningf("putMulti memcache.DeleteMulti %s", err)

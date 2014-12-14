@@ -127,26 +127,26 @@ func TestDeleteInTransaction(t *testing.T) {
 		Val int
 	}
 
-    key := datastore.NewKey(c, "TestEntity", "", 1, nil)
-    if _, err := nds.Put(c, key, &testEntity{2}); err != nil {
-        t.Fatal(err)
-    }
+	key := datastore.NewKey(c, "TestEntity", "", 1, nil)
+	if _, err := nds.Put(c, key, &testEntity{2}); err != nil {
+		t.Fatal(err)
+	}
 
-    // Prime cache.
-    if err := nds.Get(c, key, &testEntity{}); err != nil {
-        t.Fatal(err)
-    }
+	// Prime cache.
+	if err := nds.Get(c, key, &testEntity{}); err != nil {
+		t.Fatal(err)
+	}
 
-    if err := nds.RunInTransaction(c, func(tc appengine.Context) error {
-        return nds.DeleteMulti(tc, []*datastore.Key{key})
-    }, nil); err != nil {
-        t.Fatal(err)
-    }
+	if err := nds.RunInTransaction(c, func(tc appengine.Context) error {
+		return nds.DeleteMulti(tc, []*datastore.Key{key})
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
 
-    err = nds.Get(c, key, &testEntity{})
-    if err == nil {
-        t.Fatal("expected no entity")
-    } else if err != datastore.ErrNoSuchEntity {
-        t.Fatal(err)
-    }
+	err = nds.Get(c, key, &testEntity{})
+	if err == nil {
+		t.Fatal("expected no entity")
+	} else if err != datastore.ErrNoSuchEntity {
+		t.Fatal(err)
+	}
 }

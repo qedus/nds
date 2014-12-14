@@ -12,8 +12,8 @@ type txContext struct {
 }
 
 func transactionContext(c appengine.Context) (*txContext, bool) {
-    txc, ok := c.(*txContext)
-    return txc, ok
+	txc, ok := c.(*txContext)
+	return txc, ok
 }
 
 // RunInTransaction works just like datastore.RunInTransaction however it
