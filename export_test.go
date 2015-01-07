@@ -22,6 +22,8 @@ var (
 
 	NoneItem   = noneItem
 	EntityItem = entityItem
+
+	MemcacheMaxKeySize = memcacheMaxKeySize
 )
 
 func SetMemcacheAddMulti(f func(c appengine.Context,
@@ -68,4 +70,8 @@ func SetUnmarshal(f func(data []byte, pl *datastore.PropertyList) error) {
 
 func SetValue(val reflect.Value, pl datastore.PropertyList) error {
 	return setValue(val, pl)
+}
+
+func CreateMemcacheKey(key *datastore.Key) string {
+	return createMemcacheKey(key)
 }

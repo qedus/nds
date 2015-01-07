@@ -1,6 +1,8 @@
 package nds_test
 
 import (
+	"encoding/hex"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
@@ -698,5 +700,32 @@ func TestMartialPropertyListError(t *testing.T) {
 	}
 	if _, err := nds.MarshalPropertyList(pl); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func randHexString(length int) string {
+	bytes := make([]byte, length)
+	for i := range bytes {
+		bytes[i] = byte(rand.Int())
+	}
+	return hex.EncodeToString(bytes)
+}
+
+func TestCreateMemcacheKey(t *testing.T) {
+
+	c, err := aetest.NewContext(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	// Check keys are hashed over nds.MemcacheMaxKeySize.
+	maxKeySize := nds.MemcacheMaxKeySize
+	key := datastore.NewKey(c, "TestEntity",
+		randHexString(maxKeySize+10), 0, nil)
+
+	memcacheKey := nds.CreateMemcacheKey(key)
+	if len(memcacheKey) > maxKeySize {
+		t.Fatal("incorrect memcache key size")
 	}
 }

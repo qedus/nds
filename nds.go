@@ -2,8 +2,10 @@ package nds
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/binary"
 	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"math/rand"
 	"reflect"
@@ -24,6 +26,10 @@ const (
 	// time an underlying datastore call will retry even if the API reports a
 	// success to the user.
 	memcacheLockTime = 32 * time.Second
+
+	// memcacheMaxKeySize is the maximum size a memcache item key can be. Keys
+	// greater than this size are automatically hashed to a smaller size.
+	memcacheMaxKeySize = 250
 )
 
 var (
@@ -155,7 +161,12 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 }
 
 func createMemcacheKey(key *datastore.Key) string {
-	return memcachePrefix + key.Encode()
+	memcacheKey := memcachePrefix + key.Encode()
+	if len(memcacheKey) > memcacheMaxKeySize {
+		hash := sha1.Sum([]byte(memcacheKey))
+		memcacheKey = hex.EncodeToString(hash[:])
+	}
+	return memcacheKey
 }
 
 // SaveStruct saves src to a datastore.PropertyList. src must be a struct
