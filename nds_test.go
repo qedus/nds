@@ -52,9 +52,9 @@ func TestPutGetDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	nds.SetMemcacheSetMulti(nds.ZeroMemcacheSetMulti)
+	nds.SetMemcacheSetMulti(memcache.SetMulti)
 	nds.SetDatastorePutMulti(datastore.PutMulti)
-	nds.SetMemcacheDeleteMulti(nds.ZeroMemcacheDeleteMulti)
+	nds.SetMemcacheDeleteMulti(memcache.DeleteMulti)
 
 	if s := <-seq; s != "memcache.SetMulti" {
 		t.Fatal("memcache.SetMulti not", s)

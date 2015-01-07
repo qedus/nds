@@ -11,12 +11,6 @@ import (
 var (
 	PropertyLoadSaverToPropertyList = propertyLoadSaverToPropertyList
 
-	ZeroMemcacheAddMulti            = zeroMemcacheAddMulti
-	ZeroMemcacheCompareAndSwapMulti = zeroMemcacheCompareAndSwapMulti
-	ZeroMemcacheDeleteMulti         = zeroMemcacheDeleteMulti
-	ZeroMemcacheGetMulti            = zeroMemcacheGetMulti
-	ZeroMemcacheSetMulti            = zeroMemcacheSetMulti
-
 	MarshalPropertyList   = marshalPropertyList
 	UnmarshalPropertyList = unmarshalPropertyList
 

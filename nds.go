@@ -45,59 +45,15 @@ var (
 	datastoreGetMulti    = datastore.GetMulti
 	datastorePutMulti    = datastore.PutMulti
 
-	// Memcache calls are replaced with ones that don't hit the backend service
-	// if len(keys) or len(items) == 0. This should be changed once issue
-	// http://goo.gl/AW96Fi has been resolved with the Go App Engine SDK.
-	memcacheAddMulti            = zeroMemcacheAddMulti
-	memcacheCompareAndSwapMulti = zeroMemcacheCompareAndSwapMulti
-	memcacheDeleteMulti         = zeroMemcacheDeleteMulti
-	memcacheGetMulti            = zeroMemcacheGetMulti
-	memcacheSetMulti            = zeroMemcacheSetMulti
+	memcacheAddMulti            = memcache.AddMulti
+	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
+	memcacheDeleteMulti         = memcache.DeleteMulti
+	memcacheGetMulti            = memcache.GetMulti
+	memcacheSetMulti            = memcache.SetMulti
 
 	marshal   = marshalPropertyList
 	unmarshal = unmarshalPropertyList
 )
-
-// The following memcache functions are enclosed to ensure the underlying
-// App Engine service is not called when there are no keys or items to be
-// called with. The datastore calls do not need this because they already check
-// for this condition and short-circuit.
-func zeroMemcacheAddMulti(c appengine.Context, items []*memcache.Item) error {
-	if len(items) == 0 {
-		return nil
-	}
-	return memcache.AddMulti(c, items)
-}
-
-func zeroMemcacheCompareAndSwapMulti(c appengine.Context,
-	items []*memcache.Item) error {
-	if len(items) == 0 {
-		return nil
-	}
-	return memcache.CompareAndSwapMulti(c, items)
-}
-
-func zeroMemcacheGetMulti(c appengine.Context, keys []string) (
-	map[string]*memcache.Item, error) {
-	if len(keys) == 0 {
-		return make(map[string]*memcache.Item, 0), nil
-	}
-	return memcache.GetMulti(c, keys)
-}
-
-func zeroMemcacheDeleteMulti(c appengine.Context, keys []string) error {
-	if len(keys) == 0 {
-		return nil
-	}
-	return memcache.DeleteMulti(c, keys)
-}
-
-func zeroMemcacheSetMulti(c appengine.Context, items []*memcache.Item) error {
-	if len(items) == 0 {
-		return nil
-	}
-	return memcache.SetMulti(c, items)
-}
 
 const (
 	noneItem uint32 = iota

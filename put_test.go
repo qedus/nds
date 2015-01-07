@@ -95,7 +95,7 @@ func TestPutMultiLockFailure(t *testing.T) {
 	})
 
 	defer func() {
-		nds.SetMemcacheSetMulti(nds.ZeroMemcacheSetMulti)
+		nds.SetMemcacheSetMulti(memcache.SetMulti)
 	}()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
@@ -123,7 +123,7 @@ func TestPutMultiUnlockMemcacheSuccess(t *testing.T) {
 	})
 
 	defer func() {
-		nds.SetMemcacheDeleteMulti(nds.ZeroMemcacheDeleteMulti)
+		nds.SetMemcacheDeleteMulti(memcache.DeleteMulti)
 	}()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}

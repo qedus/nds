@@ -491,10 +491,10 @@ func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
 	// Fail to unmarshal test.
 	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
-	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- memcache.GetMulti
 	memcacheGetChan <- func(c appengine.Context,
 		keys []string) (map[string]*memcache.Item, error) {
-		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -521,7 +521,7 @@ func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+	defer nds.SetMemcacheGetMulti(memcache.GetMulti)
 
 	for i := 0; i < len(keys); i++ {
 		if entities[i].IntVal != response[i].IntVal {
@@ -554,10 +554,10 @@ func TestGetMultiLockReturnEntity(t *testing.T) {
 
 	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
-	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- memcache.GetMulti
 	memcacheGetChan <- func(c appengine.Context,
 		keys []string) (map[string]*memcache.Item, error) {
-		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -584,7 +584,7 @@ func TestGetMultiLockReturnEntity(t *testing.T) {
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+	defer nds.SetMemcacheGetMulti(memcache.GetMulti)
 
 	for i := 0; i < len(keys); i++ {
 		if 5 != response[i].IntVal {
@@ -617,10 +617,10 @@ func TestGetMultiLockReturnUnknown(t *testing.T) {
 
 	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
-	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- memcache.GetMulti
 	memcacheGetChan <- func(c appengine.Context,
 		keys []string) (map[string]*memcache.Item, error) {
-		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -640,7 +640,7 @@ func TestGetMultiLockReturnUnknown(t *testing.T) {
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+	defer nds.SetMemcacheGetMulti(memcache.GetMulti)
 
 	for i := 0; i < len(keys); i++ {
 		if entities[i].IntVal != response[i].IntVal {
@@ -673,10 +673,10 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 
 	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
-	memcacheGetChan <- nds.ZeroMemcacheGetMulti
+	memcacheGetChan <- memcache.GetMulti
 	memcacheGetChan <- func(c appengine.Context,
 		keys []string) (map[string]*memcache.Item, error) {
-		items, err := nds.ZeroMemcacheGetMulti(c, keys)
+		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -695,7 +695,7 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 	if err := nds.GetMulti(c, keys, response); err != nil {
 		t.Fatal(err)
 	}
-	defer nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
+	defer nds.SetMemcacheGetMulti(memcache.GetMulti)
 
 	for i := 0; i < len(keys); i++ {
 		if entities[i].IntVal != response[i].IntVal {
@@ -795,11 +795,11 @@ func TestGetMultiPaths(t *testing.T) {
 			20,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
+				memcache.GetMulti,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -813,11 +813,11 @@ func TestGetMultiPaths(t *testing.T) {
 			2,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
+				memcache.GetMulti,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastoreGetMultiFail,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -831,11 +831,11 @@ func TestGetMultiPaths(t *testing.T) {
 			2,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
+				memcache.GetMulti,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			func(c appengine.Context,
 				keys []*datastore.Key, vals interface{}) error {
 
@@ -859,11 +859,11 @@ func TestGetMultiPaths(t *testing.T) {
 			5,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
+				memcache.GetMulti,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			marshalFail,
 			[]unmarshalFunc{
@@ -895,11 +895,11 @@ func TestGetMultiPaths(t *testing.T) {
 			20,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
 				memcacheGetMultiFail,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -914,8 +914,8 @@ func TestGetMultiPaths(t *testing.T) {
 			2,
 			[]memcacheGetMultiFunc{
 				// Charge memcache.
-				nds.ZeroMemcacheGetMulti,
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
+				memcache.GetMulti,
 				// Corrupt memcache.
 				func(c appengine.Context, keys []string) (
 					map[string]*memcache.Item, error) {
@@ -926,10 +926,10 @@ func TestGetMultiPaths(t *testing.T) {
 					}
 					return items, err
 				},
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -946,8 +946,8 @@ func TestGetMultiPaths(t *testing.T) {
 			2,
 			[]memcacheGetMultiFunc{
 				// Charge memcache.
-				nds.ZeroMemcacheGetMulti,
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
+				memcache.GetMulti,
 				// Corrupt memcache flags.
 				func(c appengine.Context, keys []string) (
 					map[string]*memcache.Item, error) {
@@ -958,10 +958,10 @@ func TestGetMultiPaths(t *testing.T) {
 					}
 					return items, err
 				},
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -977,7 +977,7 @@ func TestGetMultiPaths(t *testing.T) {
 			20,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
 				func(c appengine.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
@@ -988,8 +988,8 @@ func TestGetMultiPaths(t *testing.T) {
 					return items, err
 				},
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -1003,7 +1003,7 @@ func TestGetMultiPaths(t *testing.T) {
 			2,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
 				func(c appengine.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
@@ -1014,8 +1014,8 @@ func TestGetMultiPaths(t *testing.T) {
 					return items, err
 				},
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -1034,7 +1034,7 @@ func TestGetMultiPaths(t *testing.T) {
 			2,
 			1,
 			[]memcacheGetMultiFunc{
-				nds.ZeroMemcacheGetMulti,
+				memcache.GetMulti,
 				func(c appengine.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
@@ -1045,8 +1045,8 @@ func TestGetMultiPaths(t *testing.T) {
 					return items, err
 				},
 			},
-			nds.ZeroMemcacheAddMulti,
-			nds.ZeroMemcacheCompareAndSwapMulti,
+			memcache.AddMulti,
+			memcache.CompareAndSwapMulti,
 			datastore.GetMulti,
 			nds.MarshalPropertyList,
 			[]unmarshalFunc{
@@ -1146,9 +1146,9 @@ func TestGetMultiPaths(t *testing.T) {
 		}
 
 		// Reset App Engine API calls.
-		nds.SetMemcacheGetMulti(nds.ZeroMemcacheGetMulti)
-		nds.SetMemcacheAddMulti(nds.ZeroMemcacheAddMulti)
-		nds.SetMemcacheCompareAndSwapMulti(nds.ZeroMemcacheCompareAndSwapMulti)
+		nds.SetMemcacheGetMulti(memcache.GetMulti)
+		nds.SetMemcacheAddMulti(memcache.AddMulti)
+		nds.SetMemcacheCompareAndSwapMulti(memcache.CompareAndSwapMulti)
 		nds.SetDatastoreGetMulti(datastore.GetMulti)
 		nds.SetMarshal(nds.MarshalPropertyList)
 		nds.SetUnmarshal(nds.UnmarshalPropertyList)
