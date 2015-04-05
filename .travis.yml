@@ -4,7 +4,7 @@ go:
  - 1.4.2
 before_install:
  - wget https://sdkversion.appspot.com/
- - for z in *.zip; do unzip -d $HOME $z; done
+ - unzip -d $HOME *
  - export PATH=$PATH:$HOME/go_appengine
 install:
  - goapp get -v github.com/qedus/nds
