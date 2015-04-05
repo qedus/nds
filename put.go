@@ -63,8 +63,8 @@ func putMulti(c context.Context,
 		}
 	}
 
-	if txc, ok := transactionContext(c); ok {
-		txc.lockMemcacheItems = append(txc.lockMemcacheItems,
+	if tx, ok := transactionFromContext(c); ok {
+		tx.lockMemcacheItems = append(tx.lockMemcacheItems,
 			lockMemcacheItems...)
 	} else if err := memcacheSetMulti(c, lockMemcacheItems); err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func putMulti(c context.Context,
 		return nil, err
 	}
 
-	if _, ok := transactionContext(c); !ok {
+	if _, ok := transactionFromContext(c); !ok {
 		// Remove the locks.
 		if err := memcacheDeleteMulti(c, lockMemcacheKeys); err != nil {
 			log.Warningf(c, "putMulti memcache.DeleteMulti %s", err)

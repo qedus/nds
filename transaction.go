@@ -6,14 +6,15 @@ import (
 	"google.golang.org/appengine/memcache"
 )
 
-type txContext struct {
-	context.Context
+var transactionKey = "used for *transaction"
+
+type transaction struct {
 	lockMemcacheItems []*memcache.Item
 }
 
-func transactionContext(c context.Context) (*txContext, bool) {
-	txc, ok := c.(*txContext)
-	return txc, ok
+func transactionFromContext(c context.Context) (*transaction, bool) {
+	tx, ok := c.Value(&transactionKey).(*transaction)
+	return tx, ok
 }
 
 // RunInTransaction works just like datastore.RunInTransaction however it
@@ -23,12 +24,11 @@ func RunInTransaction(c context.Context, f func(tc context.Context) error,
 	opts *datastore.TransactionOptions) error {
 
 	return datastore.RunInTransaction(c, func(tc context.Context) error {
-		txc := &txContext{
-			Context: tc,
-		}
-		if err := f(txc); err != nil {
+		tx := &transaction{}
+		tc = context.WithValue(tc, &transactionKey, tx)
+		if err := f(tc); err != nil {
 			return err
 		}
-		return memcacheSetMulti(tc, txc.lockMemcacheItems)
+		return memcacheSetMulti(tc, tx.lockMemcacheItems)
 	}, opts)
 }
