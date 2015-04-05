@@ -9,18 +9,15 @@ import (
 
 	"errors"
 
-	"appengine"
-	"appengine/aetest"
-	"appengine/datastore"
-	"appengine/memcache"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/memcache"
 )
 
 func TestGetMultiStruct(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -61,11 +58,8 @@ func TestGetMultiStruct(t *testing.T) {
 }
 
 func TestGetMultiStructPtr(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -113,11 +107,8 @@ func TestGetMultiStructPtr(t *testing.T) {
 }
 
 func TestGetMultiInterface(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -173,11 +164,8 @@ func TestGetMultiInterface(t *testing.T) {
 }
 
 func TestGetMultiPropertyLoadSaver(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int
@@ -189,8 +177,8 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	for i := 1; i < 3; i++ {
 		keys = append(keys, datastore.NewKey(c, "Entity", "", int64(i), nil))
 
-		pl := datastore.PropertyList{}
-		if err := nds.SaveStruct(&testEntity{i}, &pl); err != nil {
+		pl, err := datastore.SaveStruct(&testEntity{i})
+		if err != nil {
 			t.Fatal(err)
 		}
 		entities = append(entities, pl)
@@ -229,7 +217,7 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 	// change to fetching with structs.
 	// Do this by making sure the datastore is not called on this following
 	// GetMulti as memcache should have worked.
-	nds.SetDatastoreGetMulti(func(c appengine.Context,
+	nds.SetDatastoreGetMulti(func(c context.Context,
 		keys []*datastore.Key, vals interface{}) error {
 		if len(keys) != 0 {
 			return errors.New("should not be called")
@@ -246,11 +234,8 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 }
 
 func TestGetMultiNoKeys(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -265,11 +250,8 @@ func TestGetMultiNoKeys(t *testing.T) {
 }
 
 func TestGetMultiInterfaceError(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -327,11 +309,8 @@ func newReaderTestEntity() io.Reader {
 }
 
 func TestGetArgs(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -361,11 +340,8 @@ func TestGetArgs(t *testing.T) {
 }
 
 func TestGetMultiArgs(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -397,11 +373,8 @@ func TestGetMultiArgs(t *testing.T) {
 }
 
 func TestGetSliceProperty(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVals []int64
@@ -437,11 +410,8 @@ func TestGetSliceProperty(t *testing.T) {
 }
 
 func TestGetMultiNoPropertyList(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
 	pl := datastore.PropertyList{datastore.Property{}}
@@ -452,11 +422,8 @@ func TestGetMultiNoPropertyList(t *testing.T) {
 }
 
 func TestGetMultiNonStruct(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
 	vals := []int{12}
@@ -467,11 +434,8 @@ func TestGetMultiNonStruct(t *testing.T) {
 }
 
 func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -489,10 +453,10 @@ func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
 	}
 
 	// Fail to unmarshal test.
-	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+	memcacheGetChan := make(chan func(c context.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
 	memcacheGetChan <- memcache.GetMulti
-	memcacheGetChan <- func(c appengine.Context,
+	memcacheGetChan <- func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
@@ -511,7 +475,7 @@ func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
 		items[keys[1]].Value = value
 		return items, nil
 	}
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
+	nds.SetMemcacheGetMulti(func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		f := <-memcacheGetChan
 		return f(c, keys)
@@ -531,11 +495,8 @@ func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
 }
 
 func TestGetMultiLockReturnEntity(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -552,10 +513,10 @@ func TestGetMultiLockReturnEntity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+	memcacheGetChan := make(chan func(c context.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
 	memcacheGetChan <- memcache.GetMulti
-	memcacheGetChan <- func(c appengine.Context,
+	memcacheGetChan <- func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
@@ -574,7 +535,7 @@ func TestGetMultiLockReturnEntity(t *testing.T) {
 		items[keys[1]].Value = value
 		return items, nil
 	}
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
+	nds.SetMemcacheGetMulti(func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		f := <-memcacheGetChan
 		return f(c, keys)
@@ -594,11 +555,8 @@ func TestGetMultiLockReturnEntity(t *testing.T) {
 }
 
 func TestGetMultiLockReturnUnknown(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -615,10 +573,10 @@ func TestGetMultiLockReturnUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+	memcacheGetChan := make(chan func(c context.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
 	memcacheGetChan <- memcache.GetMulti
-	memcacheGetChan <- func(c appengine.Context,
+	memcacheGetChan <- func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
@@ -630,7 +588,7 @@ func TestGetMultiLockReturnUnknown(t *testing.T) {
 		items[keys[1]].Flags = 24
 		return items, nil
 	}
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
+	nds.SetMemcacheGetMulti(func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		f := <-memcacheGetChan
 		return f(c, keys)
@@ -650,11 +608,8 @@ func TestGetMultiLockReturnUnknown(t *testing.T) {
 }
 
 func TestGetMultiLockReturnMiss(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
@@ -671,10 +626,10 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	memcacheGetChan := make(chan func(c appengine.Context, keys []string) (
+	memcacheGetChan := make(chan func(c context.Context, keys []string) (
 		map[string]*memcache.Item, error), 2)
 	memcacheGetChan <- memcache.GetMulti
-	memcacheGetChan <- func(c appengine.Context,
+	memcacheGetChan <- func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		items, err := memcache.GetMulti(c, keys)
 		if err != nil {
@@ -685,7 +640,7 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 		delete(items, keys[0])
 		return items, nil
 	}
-	nds.SetMemcacheGetMulti(func(c appengine.Context,
+	nds.SetMemcacheGetMulti(func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		f := <-memcacheGetChan
 		return f(c, keys)
@@ -707,30 +662,30 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 func TestGetMultiPaths(t *testing.T) {
 	expectedErr := errors.New("expected error")
 
-	type memcacheGetMultiFunc func(c appengine.Context,
+	type memcacheGetMultiFunc func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error)
-	memcacheGetMultiFail := func(c appengine.Context,
+	memcacheGetMultiFail := func(c context.Context,
 		keys []string) (map[string]*memcache.Item, error) {
 		return nil, expectedErr
 	}
 
-	type memcacheAddMultiFunc func(c appengine.Context,
+	type memcacheAddMultiFunc func(c context.Context,
 		items []*memcache.Item) error
-	memcacheAddMultiFail := func(c appengine.Context,
+	memcacheAddMultiFail := func(c context.Context,
 		items []*memcache.Item) error {
 		return expectedErr
 	}
 
-	type memcacheCompareAndSwapMultiFunc func(c appengine.Context,
+	type memcacheCompareAndSwapMultiFunc func(c context.Context,
 		items []*memcache.Item) error
-	memcacheCompareAndSwapMultiFail := func(c appengine.Context,
+	memcacheCompareAndSwapMultiFail := func(c context.Context,
 		items []*memcache.Item) error {
 		return expectedErr
 	}
 
-	type datastoreGetMultiFunc func(c appengine.Context,
+	type datastoreGetMultiFunc func(c context.Context,
 		keys []*datastore.Key, vals interface{}) error
-	datastoreGetMultiFail := func(c appengine.Context,
+	datastoreGetMultiFail := func(c context.Context,
 		keys []*datastore.Key, vals interface{}) error {
 		return expectedErr
 	}
@@ -747,17 +702,14 @@ func TestGetMultiPaths(t *testing.T) {
 	   }
 	*/
 
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		IntVal int64
 	}
 
-	keysVals := func(c appengine.Context, count int64) (
+	keysVals := func(c context.Context, count int64) (
 		[]*datastore.Key, []testEntity) {
 
 		keys, vals := make([]*datastore.Key, count), make([]testEntity, count)
@@ -836,7 +788,7 @@ func TestGetMultiPaths(t *testing.T) {
 			},
 			memcache.AddMulti,
 			memcache.CompareAndSwapMulti,
-			func(c appengine.Context,
+			func(c context.Context,
 				keys []*datastore.Key, vals interface{}) error {
 
 				me := make(appengine.MultiError, len(keys))
@@ -917,7 +869,7 @@ func TestGetMultiPaths(t *testing.T) {
 				memcache.GetMulti,
 				memcache.GetMulti,
 				// Corrupt memcache.
-				func(c appengine.Context, keys []string) (
+				func(c context.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
 					// Corrupt items.
@@ -949,7 +901,7 @@ func TestGetMultiPaths(t *testing.T) {
 				memcache.GetMulti,
 				memcache.GetMulti,
 				// Corrupt memcache flags.
-				func(c appengine.Context, keys []string) (
+				func(c context.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
 					// Corrupt flags with unknown number.
@@ -978,7 +930,7 @@ func TestGetMultiPaths(t *testing.T) {
 			1,
 			[]memcacheGetMultiFunc{
 				memcache.GetMulti,
-				func(c appengine.Context, keys []string) (
+				func(c context.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
 					// Corrupt flags with unknown number.
@@ -1004,7 +956,7 @@ func TestGetMultiPaths(t *testing.T) {
 			1,
 			[]memcacheGetMultiFunc{
 				memcache.GetMulti,
-				func(c appengine.Context, keys []string) (
+				func(c context.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
 					// Corrupt flags with unknown number.
@@ -1035,7 +987,7 @@ func TestGetMultiPaths(t *testing.T) {
 			1,
 			[]memcacheGetMultiFunc{
 				memcache.GetMulti,
-				func(c appengine.Context, keys []string) (
+				func(c context.Context, keys []string) (
 					map[string]*memcache.Item, error) {
 					items, err := memcache.GetMulti(c, keys)
 					// Corrupt flags with unknown number.
@@ -1072,7 +1024,7 @@ func TestGetMultiPaths(t *testing.T) {
 			memcacheGetChan <- fn
 		}
 
-		nds.SetMemcacheGetMulti(func(c appengine.Context, keys []string) (
+		nds.SetMemcacheGetMulti(func(c context.Context, keys []string) (
 			map[string]*memcache.Item, error) {
 			fn := <-memcacheGetChan
 			return fn(c, keys)

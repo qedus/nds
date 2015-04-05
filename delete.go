@@ -1,19 +1,20 @@
 package nds
 
 import (
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/memcache"
 )
 
 // DeleteMulti works just like datastore.DeleteMulti except it maintains
 // cache consistency with other NDS methods.
-func DeleteMulti(c appengine.Context, keys []*datastore.Key) error {
+func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 	return deleteMulti(c, keys)
 }
 
 // Delete deletes the entity for the given key.
-func Delete(c appengine.Context, key *datastore.Key) error {
+func Delete(c context.Context, key *datastore.Key) error {
 	err := deleteMulti(c, []*datastore.Key{key})
 	if me, ok := err.(appengine.MultiError); ok {
 		return me[0]
@@ -21,7 +22,7 @@ func Delete(c appengine.Context, key *datastore.Key) error {
 	return err
 }
 
-func deleteMulti(c appengine.Context, keys []*datastore.Key) error {
+func deleteMulti(c context.Context, keys []*datastore.Key) error {
 
 	lockMemcacheItems := []*memcache.Item{}
 	for _, key := range keys {

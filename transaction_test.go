@@ -4,25 +4,20 @@ import (
 	"testing"
 
 	"github.com/qedus/nds"
-
-	"appengine"
-	"appengine/aetest"
-	"appengine/datastore"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
 )
 
 func TestTransactionOptions(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		Val int
 	}
 
 	opts := &datastore.TransactionOptions{XG: true}
-	err = nds.RunInTransaction(c, func(tc appengine.Context) error {
+	err := nds.RunInTransaction(c, func(tc context.Context) error {
 		for i := 0; i < 4; i++ {
 			key := datastore.NewIncompleteKey(tc, "Entity", nil)
 			if _, err := nds.Put(tc, key, &testEntity{i}); err != nil {
@@ -37,7 +32,7 @@ func TestTransactionOptions(t *testing.T) {
 	}
 
 	opts = &datastore.TransactionOptions{XG: false}
-	err = nds.RunInTransaction(c, func(tc appengine.Context) error {
+	err = nds.RunInTransaction(c, func(tc context.Context) error {
 		for i := 0; i < 4; i++ {
 			key := datastore.NewIncompleteKey(tc, "Entity", nil)
 			if _, err := nds.Put(tc, key, &testEntity{i}); err != nil {

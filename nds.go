@@ -11,10 +11,9 @@ import (
 	"reflect"
 	"time"
 
-	"appengine"
-
-	"appengine/datastore"
-	"appengine/memcache"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/memcache"
 )
 
 const (
@@ -125,58 +124,6 @@ func createMemcacheKey(key *datastore.Key) string {
 	return memcacheKey
 }
 
-// SaveStruct saves src to a datastore.PropertyList. src must be a struct
-// pointer.
-func SaveStruct(src interface{}, pl *datastore.PropertyList) error {
-	c, err := make(chan datastore.Property), make(chan error)
-	go func() {
-		err <- datastore.SaveStruct(src, c)
-	}()
-	for p := range c {
-		*pl = append(*pl, p)
-	}
-	return <-err
-}
-
-// LoadStruct loads a datastore.PropertyList into dst. dst must be a struct
-// pointer.
-func LoadStruct(dst interface{}, pl datastore.PropertyList) error {
-	c := make(chan datastore.Property)
-	go func() {
-		for _, p := range pl {
-			c <- p
-		}
-		close(c)
-	}()
-	return datastore.LoadStruct(dst, c)
-}
-
-func propertyLoadSaverToPropertyList(
-	pls datastore.PropertyLoadSaver, pl *datastore.PropertyList) error {
-	c, err := make(chan datastore.Property), make(chan error)
-	go func() {
-		err <- pls.Save(c)
-	}()
-	for p := range c {
-		*pl = append(*pl, p)
-	}
-	return <-err
-}
-
-func propertyListToPropertyLoadSaver(
-	pl datastore.PropertyList, pls datastore.PropertyLoadSaver) error {
-
-	c := make(chan datastore.Property)
-	go func() {
-		for _, p := range pl {
-			c <- p
-		}
-		close(c)
-	}()
-
-	return pls.Load(c)
-}
-
 func marshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
 	buf := bytes.Buffer{}
 	if err := gob.NewEncoder(&buf).Encode(&pl); err != nil {
@@ -196,11 +143,11 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 	}
 
 	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
-		return propertyListToPropertyLoadSaver(pl, pls)
+		return pls.Load(pl)
 	}
 
 	if val.Kind() == reflect.Struct {
 		val = val.Addr()
 	}
-	return LoadStruct(val.Interface(), pl)
+	return datastore.LoadStruct(val.Interface(), pl)
 }

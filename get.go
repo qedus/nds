@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"sync"
 
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
 )
 
 // getMultiLimit is the App Engine datastore limit for the maximum number
@@ -49,7 +51,7 @@ const getMultiLimit = 1000
 // As a special case, datastore.PropertyList is an invalid type for dst, even
 // though a PropertyList is a slice of structs. It is treated as invalid to
 // avoid being mistakenly passed when []datastore.PropertyList was intended.
-func GetMulti(c appengine.Context,
+func GetMulti(c context.Context,
 	keys []*datastore.Key, vals interface{}) error {
 
 	v := reflect.ValueOf(vals)
@@ -128,7 +130,7 @@ func GetMulti(c appengine.Context,
 // type than the one it was stored from, or when a field is missing or
 // unexported in the destination struct. ErrFieldMismatch is only returned if
 // val is a struct pointer.
-func Get(c appengine.Context, key *datastore.Key, val interface{}) error {
+func Get(c context.Context, key *datastore.Key, val interface{}) error {
 
 	err := GetMulti(c, []*datastore.Key{key}, []interface{}{val})
 	if me, ok := err.(appengine.MultiError); ok {
@@ -164,7 +166,7 @@ type cacheItem struct {
 // function, datastore or server fails at any point. The caching strategy is
 // borrowed from Python ndb with some improvements that eliminate some
 // consistency issues surrounding ndb, including http://goo.gl/3ByVlA.
-func getMulti(c appengine.Context,
+func getMulti(c context.Context,
 	keys []*datastore.Key, vals reflect.Value) error {
 
 	cacheItems := make([]cacheItem, len(keys))
@@ -199,7 +201,7 @@ func getMulti(c appengine.Context,
 	return me
 }
 
-func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
+func loadMemcache(c context.Context, cacheItems []cacheItem) {
 
 	memcacheKeys := make([]string, len(cacheItems))
 	for i, cacheItem := range cacheItems {
@@ -211,7 +213,7 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 		for i := range cacheItems {
 			cacheItems[i].state = externalLock
 		}
-		c.Warningf("nds:loadMemcache GetMulti %s", err)
+		log.Warningf(c, "nds:loadMemcache GetMulti %s", err)
 		return
 	}
 
@@ -226,25 +228,25 @@ func loadMemcache(c appengine.Context, cacheItems []cacheItem) {
 			case entityItem:
 				pl := datastore.PropertyList{}
 				if err := unmarshal(item.Value, &pl); err != nil {
-					c.Warningf("nds:loadMemcache unmarshal %s", err)
+					log.Warningf(c, "nds:loadMemcache unmarshal %s", err)
 					cacheItems[i].state = externalLock
 					break
 				}
 				if err := setValue(cacheItems[i].val, pl); err == nil {
 					cacheItems[i].state = done
 				} else {
-					c.Warningf("nds:loadMemcache setValue %s", err)
+					log.Warningf(c, "nds:loadMemcache setValue %s", err)
 					cacheItems[i].state = externalLock
 				}
 			default:
-				c.Warningf("nds:loadMemcache unknown item.Flags %d", item.Flags)
+				log.Warningf(c, "nds:loadMemcache unknown item.Flags %d", item.Flags)
 				cacheItems[i].state = externalLock
 			}
 		}
 	}
 }
 
-func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
+func lockMemcache(c context.Context, cacheItems []cacheItem) {
 
 	lockItems := make([]*memcache.Item, 0, len(cacheItems))
 	lockMemcacheKeys := make([]string, 0, len(cacheItems))
@@ -265,7 +267,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 
 	// We don't care if there are errors here.
 	if err := memcacheAddMulti(c, lockItems); err != nil {
-		c.Warningf("nds:lockMemcache AddMulti %s", err)
+		log.Warningf(c, "nds:lockMemcache AddMulti %s", err)
 	}
 
 	// Get the items again so we can use CAS when updating the cache.
@@ -278,7 +280,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 				cacheItems[i].state = externalLock
 			}
 		}
-		c.Warningf("nds:lockMemcache GetMulti %s", err)
+		log.Warningf(c, "nds:lockMemcache GetMulti %s", err)
 		return
 	}
 
@@ -300,18 +302,18 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 				case entityItem:
 					pl := datastore.PropertyList{}
 					if err := unmarshal(item.Value, &pl); err != nil {
-						c.Warningf("nds:lockMemcache unmarshal %s", err)
+						log.Warningf(c, "nds:lockMemcache unmarshal %s", err)
 						cacheItems[i].state = externalLock
 						break
 					}
 					if err := setValue(cacheItems[i].val, pl); err == nil {
 						cacheItems[i].state = done
 					} else {
-						c.Warningf("nds:lockMemcache setValue %s", err)
+						log.Warningf(c, "nds:lockMemcache setValue %s", err)
 						cacheItems[i].state = externalLock
 					}
 				default:
-					c.Warningf("nds:lockMemcache unknown item.Flags %d",
+					log.Warningf(c, "nds:lockMemcache unknown item.Flags %d",
 						item.Flags)
 					cacheItems[i].state = externalLock
 				}
@@ -324,7 +326,7 @@ func lockMemcache(c appengine.Context, cacheItems []cacheItem) {
 	}
 }
 
-func loadDatastore(c appengine.Context, cacheItems []cacheItem,
+func loadDatastore(c context.Context, cacheItems []cacheItem,
 	valsType reflect.Type) error {
 
 	keys := make([]*datastore.Key, 0, len(cacheItems))
@@ -365,7 +367,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 					cacheItems[index].item.Value = data
 				} else {
 					cacheItems[index].state = externalLock
-					c.Warningf("nds:loadDatastore marshal %s", err)
+					log.Warningf(c, "nds:loadDatastore marshal %s", err)
 				}
 			}
 		case datastore.ErrNoSuchEntity:
@@ -383,7 +385,7 @@ func loadDatastore(c appengine.Context, cacheItems []cacheItem,
 	return nil
 }
 
-func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
+func saveMemcache(c context.Context, cacheItems []cacheItem) {
 
 	saveItems := make([]*memcache.Item, 0, len(cacheItems))
 	for _, cacheItem := range cacheItems {
@@ -393,6 +395,6 @@ func saveMemcache(c appengine.Context, cacheItems []cacheItem) {
 	}
 
 	if err := memcacheCompareAndSwapMulti(c, saveItems); err != nil {
-		c.Warningf("nds:saveMemcache CompareAndSwapMulti %s", err)
+		log.Warningf(c, "nds:saveMemcache CompareAndSwapMulti %s", err)
 	}
 }

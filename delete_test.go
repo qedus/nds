@@ -7,18 +7,15 @@ import (
 
 	"errors"
 
-	"appengine"
-	"appengine/aetest"
-	"appengine/datastore"
-	"appengine/memcache"
+	"golang.org/x/net/context"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/memcache"
 )
 
 func TestDelete(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		Val int
@@ -48,7 +45,7 @@ func TestDelete(t *testing.T) {
 
 	keys = []*datastore.Key{key}
 	entities = make([]testEntity, 1)
-	err = nds.GetMulti(c, keys, entities)
+	err := nds.GetMulti(c, keys, entities)
 	if me, ok := err.(appengine.MultiError); ok {
 		if me[0] != datastore.ErrNoSuchEntity {
 			t.Fatal("entity should be deleted", entities)
@@ -59,11 +56,8 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteNilKey(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	if err := nds.Delete(c, nil); err != datastore.ErrInvalidKey {
 		t.Fatal("expected nil key error")
@@ -71,11 +65,8 @@ func TestDeleteNilKey(t *testing.T) {
 }
 
 func TestDeleteIncompleteKey(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	if err := nds.Delete(c, nil); err != datastore.ErrInvalidKey {
 		t.Fatal("expected invalid key error")
@@ -83,11 +74,8 @@ func TestDeleteIncompleteKey(t *testing.T) {
 }
 
 func TestDeleteMemcacheFail(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		Val int
@@ -102,7 +90,7 @@ func TestDeleteMemcacheFail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	nds.SetMemcacheSetMulti(func(c appengine.Context,
+	nds.SetMemcacheSetMulti(func(c context.Context,
 		items []*memcache.Item) error {
 		return errors.New("expected error")
 	})
@@ -117,11 +105,8 @@ func TestDeleteMemcacheFail(t *testing.T) {
 }
 
 func TestDeleteInTransaction(t *testing.T) {
-	c, err := aetest.NewContext(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
 
 	type testEntity struct {
 		Val int
@@ -137,14 +122,13 @@ func TestDeleteInTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := nds.RunInTransaction(c, func(tc appengine.Context) error {
+	if err := nds.RunInTransaction(c, func(tc context.Context) error {
 		return nds.DeleteMulti(tc, []*datastore.Key{key})
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	err = nds.Get(c, key, &testEntity{})
-	if err == nil {
+	if err := nds.Get(c, key, &testEntity{}); err == nil {
 		t.Fatal("expected no entity")
 	} else if err != datastore.ErrNoSuchEntity {
 		t.Fatal(err)
