@@ -8,7 +8,7 @@ before_install:
  - export PATH=$PATH:$HOME/go_appengine
 install:
  - goapp get -v github.com/qedus/nds
- - goapp get -v code.google.com/p/go.tools/cmd/cover
+ - goapp get -v golang.org/x/tools/cmd/cover
 script:
  - goapp test -v -covermode=count -coverprofile=profile.cov
 after_success:
