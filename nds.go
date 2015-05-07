@@ -149,5 +149,8 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 	if val.Kind() == reflect.Struct {
 		val = val.Addr()
 	}
+	if val.Kind() == reflect.Ptr && val.Type().Elem().Kind() == reflect.Struct && val.IsNil() {
+		val.Set(reflect.New(val.Type().Elem()))
+	}
 	return datastore.LoadStruct(val.Interface(), pl)
 }
