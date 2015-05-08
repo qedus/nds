@@ -131,6 +131,9 @@ func GetMulti(c context.Context,
 // unexported in the destination struct. ErrFieldMismatch is only returned if
 // val is a struct pointer.
 func Get(c context.Context, key *datastore.Key, val interface{}) error {
+	if val == nil { // GetMulti catches nil interface; we need to catch nil ptr here
+		return datastore.ErrInvalidEntityType
+	}
 
 	err := GetMulti(c, []*datastore.Key{key}, []interface{}{val})
 	if me, ok := err.(appengine.MultiError); ok {

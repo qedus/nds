@@ -106,6 +106,48 @@ func TestGetMultiStructPtr(t *testing.T) {
 	}
 }
 
+func TestGetMultiStructPtrNil(t *testing.T) {
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
+
+	type testEntity struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get from datastore.
+	response := make([]*testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	for i := int64(0); i < 2; i++ {
+		if response[i].IntVal != i+1 {
+			t.Fatal("incorrect IntVal")
+		}
+	}
+
+	// Get from cache.
+	response = make([]*testEntity, len(keys))
+	if err := nds.GetMulti(c, keys, response); err != nil {
+		t.Fatal(err)
+	}
+	for i := int64(0); i < 2; i++ {
+		if response[i].IntVal != i+1 {
+			t.Fatal("incorrect IntVal")
+		}
+	}
+}
+
 func TestGetMultiInterface(t *testing.T) {
 	c, closeFunc := NewContext(t, nil)
 	defer closeFunc()
@@ -321,8 +363,8 @@ func TestGetArgs(t *testing.T) {
 	}
 
 	key := datastore.NewKey(c, "Entity", "", 1, nil)
-	if err := nds.Get(c, key, nil); err == nil {
-		t.Fatal("expected error for nil value")
+	if err := nds.Get(c, key, nil); err != datastore.ErrInvalidEntityType {
+		t.Fatal("expected ErrInvalidEntityType for nil value")
 	}
 
 	if err := nds.Get(c, key, datastore.PropertyList{}); err == nil {
