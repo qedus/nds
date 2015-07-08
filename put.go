@@ -64,8 +64,10 @@ func putMulti(c context.Context,
 	}
 
 	if tx, ok := transactionFromContext(c); ok {
+		tx.Lock()
 		tx.lockMemcacheItems = append(tx.lockMemcacheItems,
 			lockMemcacheItems...)
+		tx.Unlock()
 	} else if err := memcacheSetMulti(c, lockMemcacheItems); err != nil {
 		return nil, err
 	}

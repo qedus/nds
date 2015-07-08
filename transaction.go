@@ -1,6 +1,8 @@
 package nds
 
 import (
+	"sync"
+
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/memcache"
@@ -9,6 +11,7 @@ import (
 var transactionKey = "used for *transaction"
 
 type transaction struct {
+	sync.Mutex
 	lockMemcacheItems []*memcache.Item
 }
 
@@ -29,6 +32,10 @@ func RunInTransaction(c context.Context, f func(tc context.Context) error,
 		if err := f(tc); err != nil {
 			return err
 		}
+
+		// tx.Unlock() is not called as the tx context should never be called
+		//again so we rather block than allow people to misuse the context.
+		tx.Lock()
 		return memcacheSetMulti(tc, tx.lockMemcacheItems)
 	}, opts)
 }
