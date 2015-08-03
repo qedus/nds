@@ -701,6 +701,67 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 	}
 }
 
+// TestGetNamespacedKey ensures issue https://goo.gl/rXU8nK is fixed so that
+// memcache uses the namespace from the key instead of the context.
+func TestGetNamespacedKey(t *testing.T) {
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
+
+	const intVal = int64(12)
+	type testEntity struct {
+		IntVal int64
+	}
+
+	namespacedCtx, err := appengine.Namespace(c, "keyNamespace")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	namespacedKey := datastore.NewKey(namespacedCtx,
+		"Entity", "", key.IntID(), nil)
+	entity := &testEntity{intVal}
+
+	if namespacedKey, err = nds.Put(c, namespacedKey, entity); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prime cache.
+	if err := nds.Get(namespacedCtx, namespacedKey, &testEntity{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure that we get a value back from the cache by checking if the
+	// datastore is called at all.
+	entityFromCache := true
+	nds.SetDatastoreGetMulti(func(c context.Context,
+		keys []*datastore.Key, vals interface{}) error {
+		if len(keys) != 0 {
+			entityFromCache = false
+		}
+		return nil
+	})
+	if err := nds.Get(c, namespacedKey, &testEntity{}); err != nil {
+		t.Fatal(err)
+	}
+	nds.SetDatastoreGetMulti(datastore.GetMulti)
+
+	if !entityFromCache {
+		t.Fatal("entity not obtained from cache")
+	}
+
+	if err := nds.Delete(namespacedCtx, namespacedKey); err != nil {
+		t.Fatal(err)
+	}
+
+	entity = &testEntity{}
+	if err := nds.Get(c, namespacedKey, entity); err == nil {
+		t.Fatalf("expected no such entity error but got %+v", entity)
+	} else if err != datastore.ErrNoSuchEntity {
+		t.Fatal(err)
+	}
+}
+
 func TestGetMultiPaths(t *testing.T) {
 	expectedErr := errors.New("expected error")
 

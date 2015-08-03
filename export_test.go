@@ -67,3 +67,7 @@ func SetValue(val reflect.Value, pl datastore.PropertyList) error {
 func CreateMemcacheKey(key *datastore.Key) string {
 	return createMemcacheKey(key)
 }
+
+func SetMemcacheNamespace(namespace string) {
+	memcacheNamespace = namespace
+}

@@ -131,7 +131,8 @@ func GetMulti(c context.Context,
 // unexported in the destination struct. ErrFieldMismatch is only returned if
 // val is a struct pointer.
 func Get(c context.Context, key *datastore.Key, val interface{}) error {
-	if val == nil { // GetMulti catches nil interface; we need to catch nil ptr here
+	// GetMulti catches nil interface; we need to catch nil ptr here.
+	if val == nil {
 		return datastore.ErrInvalidEntityType
 	}
 
@@ -180,15 +181,20 @@ func getMulti(c context.Context,
 		cacheItems[i].state = miss
 	}
 
-	loadMemcache(c, cacheItems)
+	memcacheCtx, err := memcacheContext(c)
+	if err != nil {
+		return err
+	}
 
-	lockMemcache(c, cacheItems)
+	loadMemcache(memcacheCtx, cacheItems)
+
+	lockMemcache(memcacheCtx, cacheItems)
 
 	if err := loadDatastore(c, cacheItems, vals.Type()); err != nil {
 		return err
 	}
 
-	saveMemcache(c, cacheItems)
+	saveMemcache(memcacheCtx, cacheItems)
 
 	me, errsNil := make(appengine.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {

@@ -695,3 +695,31 @@ func TestCreateMemcacheKey(t *testing.T) {
 		t.Fatal("incorrect memcache key size")
 	}
 }
+
+func TestMemcacheNamespace(t *testing.T) {
+
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
+
+	type testEntity struct {
+		IntVal int
+	}
+
+	// Illegal namespace chars.
+	nds.SetMemcacheNamespace("£££")
+
+	key := datastore.NewKey(c, "Entity", "", 1, nil)
+	if err := nds.Get(c, key, &testEntity{}); err == nil {
+		t.Fatal("expected namespace error")
+	}
+
+	if _, err := nds.Put(c, key, &testEntity{}); err == nil {
+		t.Fatal("expected namespace error")
+	}
+
+	if err := nds.Delete(c, key); err == nil {
+		t.Fatal("expected namespace error")
+	}
+
+	nds.SetMemcacheNamespace("")
+}

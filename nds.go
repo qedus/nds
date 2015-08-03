@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"time"
 
+	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/memcache"
@@ -38,7 +39,7 @@ var (
 )
 
 // The variables in this block are here so that we can test all error code
-// paths by substituting the respective functions with error producing ones.
+// paths by substituting them with error producing ones.
 var (
 	datastoreDeleteMulti = datastore.DeleteMulti
 	datastoreGetMulti    = datastore.GetMulti
@@ -52,6 +53,10 @@ var (
 
 	marshal   = marshalPropertyList
 	unmarshal = unmarshalPropertyList
+
+	// memcacheNamespace is the namespace where all memcached entities are
+	// stored.
+	memcacheNamespace = ""
 )
 
 const (
@@ -122,6 +127,10 @@ func createMemcacheKey(key *datastore.Key) string {
 		memcacheKey = hex.EncodeToString(hash[:])
 	}
 	return memcacheKey
+}
+
+func memcacheContext(c context.Context) (context.Context, error) {
+	return appengine.Namespace(c, memcacheNamespace)
 }
 
 func marshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
