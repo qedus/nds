@@ -36,6 +36,10 @@ func RunInTransaction(c context.Context, f func(tc context.Context) error,
 		// tx.Unlock() is not called as the tx context should never be called
 		//again so we rather block than allow people to misuse the context.
 		tx.Lock()
-		return memcacheSetMulti(tc, tx.lockMemcacheItems)
+		memcacheCtx, err := memcacheContext(tc)
+		if err != nil {
+			return err
+		}
+		return memcacheSetMulti(memcacheCtx, tx.lockMemcacheItems)
 	}, opts)
 }
