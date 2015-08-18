@@ -1,10 +1,12 @@
 package nds_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/qedus/nds"
 	"golang.org/x/net/context"
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 )
 
@@ -46,4 +48,54 @@ func TestTransactionOptions(t *testing.T) {
 		t.Fatal("expected cross-group error")
 	}
 
+}
+
+// TestClearNamespacedLocks tests to make sure that locks are cleared when
+// RunInTransaction is using a namespace.
+func TestClearNamespacedLocks(t *testing.T) {
+	c, closeFunc := NewContext(t, nil)
+	defer closeFunc()
+
+	c, err := appengine.Namespace(c, "testnamespace")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testEntity struct {
+		Val int
+	}
+
+	key := datastore.NewKey(c, "TestEntity", "", 1, nil)
+
+	// Prime cache.
+	if err := nds.Get(c, key, &testEntity{}); err == nil {
+		t.Fatal("expected no such entity")
+	} else if err != datastore.ErrNoSuchEntity {
+		t.Fatal(err)
+	}
+
+	if err := nds.RunInTransaction(c, func(tc context.Context) error {
+
+		if err := nds.Get(tc, key, &testEntity{}); err == nil {
+			return errors.New("expected no such entity")
+		} else if err != datastore.ErrNoSuchEntity {
+			return err
+		}
+
+		if _, err := nds.Put(tc, key, &testEntity{3}); err != nil {
+			return err
+		}
+		return nil
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	entity := &testEntity{}
+	if err := nds.Get(c, key, entity); err != nil {
+		t.Fatal(err)
+	}
+
+	if entity.Val != 3 {
+		t.Fatal("incorrect val")
+	}
 }
