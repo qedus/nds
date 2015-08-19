@@ -721,5 +721,11 @@ func TestMemcacheNamespace(t *testing.T) {
 		t.Fatal("expected namespace error")
 	}
 
+	if err := nds.RunInTransaction(c, func(tc context.Context) error {
+		return nil
+	}, nil); err == nil {
+		t.Fatal("expected namespace error")
+	}
+
 	nds.SetMemcacheNamespace("")
 }
