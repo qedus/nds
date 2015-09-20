@@ -3,7 +3,6 @@ package nds_test
 import (
 	"encoding/hex"
 	"math/rand"
-	"net/http"
 	"reflect"
 	"strconv"
 	"testing"
@@ -13,23 +12,21 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/aetest"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/memcache"
-
-	"appengine/aetest"
 )
 
-type CloseFunc func()
+func NewContext(t *testing.T, opts *aetest.Options) (context.Context, func()) {
+	if opts != nil {
+		t.Fatal("aetest.Options currently unsupported")
+	}
 
-func NewContext(t *testing.T, opts *aetest.Options) (
-	context.Context, CloseFunc) {
-	c, err := aetest.NewContext(opts)
+	c, closeFunc, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	return appengine.NewContext(c.Request().(*http.Request)),
-		func() { c.Close() }
+	return c, closeFunc
 }
 
 func TestPutGetDelete(t *testing.T) {
