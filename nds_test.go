@@ -17,11 +17,7 @@ import (
 	"google.golang.org/appengine/memcache"
 )
 
-func NewContext(t *testing.T, opts *aetest.Options) (context.Context, func()) {
-	if opts != nil {
-		t.Fatal("aetest.Options currently unsupported")
-	}
-
+func NewContext(t *testing.T) (context.Context, func()) {
 	c, closeFunc, err := aetest.NewContext()
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +26,7 @@ func NewContext(t *testing.T, opts *aetest.Options) (context.Context, func()) {
 }
 
 func TestPutGetDelete(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -126,7 +122,7 @@ func TestPutGetDelete(t *testing.T) {
 }
 
 func TestInterfaces(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -203,7 +199,7 @@ func TestInterfaces(t *testing.T) {
 }
 
 func TestGetMultiNoSuchEntity(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -236,7 +232,7 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 }
 
 func TestGetMultiNoErrors(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -279,7 +275,7 @@ func TestGetMultiNoErrors(t *testing.T) {
 }
 
 func TestGetMultiErrorMix(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -343,7 +339,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 }
 
 func TestMultiCache(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -476,7 +472,7 @@ func TestMultiCache(t *testing.T) {
 }
 
 func TestRunInTransaction(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -584,7 +580,7 @@ func TestLoadSaveStruct(t *testing.T) {
 }
 
 func TestMarshalUnmarshalPropertyList(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	timeVal := time.Now()
@@ -679,7 +675,7 @@ func randHexString(length int) string {
 }
 
 func TestCreateMemcacheKey(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	// Check keys are hashed over nds.MemcacheMaxKeySize.
@@ -695,7 +691,7 @@ func TestCreateMemcacheKey(t *testing.T) {
 
 func TestMemcacheNamespace(t *testing.T) {
 
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {

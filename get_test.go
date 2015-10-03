@@ -16,7 +16,7 @@ import (
 )
 
 func TestGetMultiStruct(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -58,7 +58,7 @@ func TestGetMultiStruct(t *testing.T) {
 }
 
 func TestGetMultiStructPtr(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -107,7 +107,7 @@ func TestGetMultiStructPtr(t *testing.T) {
 }
 
 func TestGetMultiStructPtrNil(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -149,7 +149,7 @@ func TestGetMultiStructPtrNil(t *testing.T) {
 }
 
 func TestGetMultiInterface(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -206,7 +206,7 @@ func TestGetMultiInterface(t *testing.T) {
 }
 
 func TestGetMultiPropertyLoadSaver(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -276,7 +276,7 @@ func TestGetMultiPropertyLoadSaver(t *testing.T) {
 }
 
 func TestGetMultiNoKeys(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -292,7 +292,7 @@ func TestGetMultiNoKeys(t *testing.T) {
 }
 
 func TestGetMultiInterfaceError(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -351,7 +351,7 @@ func newReaderTestEntity() io.Reader {
 }
 
 func TestGetArgs(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -382,7 +382,7 @@ func TestGetArgs(t *testing.T) {
 }
 
 func TestGetMultiArgs(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -415,7 +415,7 @@ func TestGetMultiArgs(t *testing.T) {
 }
 
 func TestGetSliceProperty(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -452,7 +452,7 @@ func TestGetSliceProperty(t *testing.T) {
 }
 
 func TestGetMultiNoPropertyList(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
@@ -464,7 +464,7 @@ func TestGetMultiNoPropertyList(t *testing.T) {
 }
 
 func TestGetMultiNonStruct(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
@@ -476,7 +476,7 @@ func TestGetMultiNonStruct(t *testing.T) {
 }
 
 func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -537,7 +537,7 @@ func TestGetMultiLockReturnEntitySetValueFail(t *testing.T) {
 }
 
 func TestGetMultiLockReturnEntity(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -597,7 +597,7 @@ func TestGetMultiLockReturnEntity(t *testing.T) {
 }
 
 func TestGetMultiLockReturnUnknown(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -650,7 +650,7 @@ func TestGetMultiLockReturnUnknown(t *testing.T) {
 }
 
 func TestGetMultiLockReturnMiss(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -704,7 +704,7 @@ func TestGetMultiLockReturnMiss(t *testing.T) {
 // TestGetNamespacedKey ensures issue https://goo.gl/rXU8nK is fixed so that
 // memcache uses the namespace from the key instead of the context.
 func TestGetNamespacedKey(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	const intVal = int64(12)
@@ -805,7 +805,7 @@ func TestGetMultiPaths(t *testing.T) {
 	   }
 	*/
 
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {

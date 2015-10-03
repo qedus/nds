@@ -12,7 +12,7 @@ import (
 )
 
 func TestPutMultiNoPropertyList(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
@@ -24,7 +24,7 @@ func TestPutMultiNoPropertyList(t *testing.T) {
 }
 
 func TestPutPropertyLoadSaver(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -60,7 +60,7 @@ func TestPutPropertyLoadSaver(t *testing.T) {
 }
 
 func TestPutNilArgs(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	if _, err := nds.Put(c, nil, nil); err == nil {
@@ -69,7 +69,7 @@ func TestPutNilArgs(t *testing.T) {
 }
 
 func TestPutMultiLockFailure(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -95,7 +95,7 @@ func TestPutMultiLockFailure(t *testing.T) {
 
 // Make sure PutMulti still works if we have a memcache unlock failure.
 func TestPutMultiUnlockMemcacheSuccess(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -119,7 +119,7 @@ func TestPutMultiUnlockMemcacheSuccess(t *testing.T) {
 }
 
 func TestPutDatastoreMultiError(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -148,7 +148,7 @@ func TestPutDatastoreMultiError(t *testing.T) {
 }
 
 func TestPutMultiZeroKeys(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	if _, err := nds.PutMulti(c, []*datastore.Key{},

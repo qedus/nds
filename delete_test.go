@@ -14,7 +14,7 @@ import (
 )
 
 func TestDelete(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -56,7 +56,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteNilKey(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	if err := nds.Delete(c, nil); err != datastore.ErrInvalidKey {
@@ -65,7 +65,7 @@ func TestDeleteNilKey(t *testing.T) {
 }
 
 func TestDeleteIncompleteKey(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	if err := nds.Delete(c, nil); err != datastore.ErrInvalidKey {
@@ -74,7 +74,7 @@ func TestDeleteIncompleteKey(t *testing.T) {
 }
 
 func TestDeleteMemcacheFail(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -105,7 +105,7 @@ func TestDeleteMemcacheFail(t *testing.T) {
 }
 
 func TestDeleteInTransaction(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {

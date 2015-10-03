@@ -11,7 +11,7 @@ import (
 )
 
 func TestTransactionOptions(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	type testEntity struct {
@@ -53,7 +53,7 @@ func TestTransactionOptions(t *testing.T) {
 // TestClearNamespacedLocks tests to make sure that locks are cleared when
 // RunInTransaction is using a namespace.
 func TestClearNamespacedLocks(t *testing.T) {
-	c, closeFunc := NewContext(t, nil)
+	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
 	c, err := appengine.Namespace(c, "testnamespace")
