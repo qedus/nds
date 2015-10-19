@@ -2,6 +2,7 @@ package nds_test
 
 import (
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/qedus/nds"
@@ -10,6 +11,34 @@ import (
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/memcache"
 )
+
+func TestPutMulti(t *testing.T) {
+	c, closeFunc := NewContext(t)
+	defer closeFunc()
+
+	type TestEntity struct {
+		Value int
+	}
+
+	for _, count := range []int{499, 500, 501} {
+		keys := make([]*datastore.Key, count)
+		entities := make([]TestEntity, count)
+
+		for i := range keys {
+			keys[i] = datastore.NewKey(c, "TestEntity", strconv.Itoa(i), 0, nil)
+			entities[i] = TestEntity{i}
+		}
+
+		if _, err := nds.PutMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		entities = make([]TestEntity, count)
+		if err := nds.GetMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
 
 func TestPutMultiNoPropertyList(t *testing.T) {
 	c, closeFunc := NewContext(t)

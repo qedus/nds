@@ -8,7 +8,7 @@ Exposed parts of this API are the same as the official one distributed by Google
 
 You can find the API documentation at [http://godoc.org/github.com/qedus/nds](http://godoc.org/github.com/qedus/nds).
 
-One other benefit is that the standard `datastore.GetMulti` function only allows you to retrieve a maximum of 1000 entities at a time. The [`GetMulti`](http://godoc.org/github.com/qedus/nds#GetMulti) in this package allows you to get as many as you need (within timeout limits) by concurrently calling the datastore until your entity request is fulfilled.
+One other benefit is that the standard `datastore.GetMulti`, `datastore.PutMulti` and `datastore.DeleteMulti` functions only allow you to work with a maximum of 1000, 500 and 500 entities per call respectively. The `*Multi` in this package allow you to work with as many entities as you need (within timeout limits) by concurrently calling the appropriate datastore function until request is fulfilled.
 
 ## How To Use
 

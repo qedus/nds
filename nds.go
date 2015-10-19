@@ -163,3 +163,31 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 	}
 	return datastore.LoadStruct(val.Interface(), pl)
 }
+
+func isErrorsNil(errs []error) bool {
+	for _, err := range errs {
+		if err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func groupErrs(errs []error, total, limit int) error {
+	groupedErrs := make(appengine.MultiError, total)
+	for i, err := range errs {
+		lo := i * limit
+		hi := (i + 1) * limit
+		if hi > total {
+			hi = total
+		}
+		if me, ok := err.(appengine.MultiError); ok {
+			copy(groupedErrs[lo:hi], me)
+		} else if err != nil {
+			for j := lo; j < hi; j++ {
+				groupedErrs[j] = err
+			}
+		}
+	}
+	return groupedErrs
+}

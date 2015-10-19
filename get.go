@@ -59,10 +59,6 @@ func GetMulti(c context.Context,
 		return err
 	}
 
-	if len(keys) == 0 {
-		return nil
-	}
-
 	wg := sync.WaitGroup{}
 
 	callCount := (len(keys)-1)/getMultiLimit + 1
@@ -92,31 +88,11 @@ func GetMulti(c context.Context,
 	}
 	wg.Wait()
 
-	// Quick escape if all errors are nil.
-	errsNil := true
-	for _, err := range errs {
-		if err != nil {
-			errsNil = false
-		}
-	}
-	if errsNil {
+	if isErrorsNil(errs) {
 		return nil
 	}
 
-	groupedErrs := make(appengine.MultiError, len(keys))
-	for i, err := range errs {
-		lo := i * getMultiLimit
-		hi := (i + 1) * getMultiLimit
-		if hi > len(keys) {
-			hi = len(keys)
-		}
-		if me, ok := err.(appengine.MultiError); ok {
-			copy(groupedErrs[lo:hi], me)
-		} else if err != nil {
-			return err
-		}
-	}
-	return groupedErrs
+	return groupErrs(errs, len(keys), getMultiLimit)
 }
 
 // Get loads the entity stored for key into val, which must be a struct pointer.
