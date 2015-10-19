@@ -63,10 +63,19 @@ func GetMulti(c context.Context,
 		return nil
 	}
 
+	wg := sync.WaitGroup{}
+
 	callCount := (len(keys)-1)/getMultiLimit + 1
 	errs := make([]error, callCount)
+	call := func(i int, keys []*datastore.Key, vals reflect.Value) {
+		if _, ok := transactionFromContext(c); ok {
+			errs[i] = datastoreGetMulti(c, keys, vals.Interface())
+		} else {
+			errs[i] = getMulti(c, keys, vals)
+		}
+		wg.Done()
+	}
 
-	wg := sync.WaitGroup{}
 	wg.Add(callCount)
 	for i := 0; i < callCount; i++ {
 		lo := i * getMultiLimit
@@ -75,19 +84,11 @@ func GetMulti(c context.Context,
 			hi = len(keys)
 		}
 
-		index := i
-		keySlice := keys[lo:hi]
-		valSlice := v.Slice(lo, hi)
-
-		go func() {
-			if _, ok := transactionFromContext(c); ok {
-				errs[index] = datastoreGetMulti(c,
-					keySlice, valSlice.Interface())
-			} else {
-				errs[index] = getMulti(c, keySlice, valSlice)
-			}
-			wg.Done()
-		}()
+		if i == callCount-1 {
+			call(i, keys[lo:hi], v.Slice(lo, hi))
+		} else {
+			go call(i, keys[lo:hi], v.Slice(lo, hi))
+		}
 	}
 	wg.Wait()
 
