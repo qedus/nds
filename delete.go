@@ -30,7 +30,7 @@ func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 	wg.Add(callCount)
 	for i := 0; i < callCount; i++ {
 		lo := i * deleteMultiLimit
-		hi := (i + 1) * getMultiLimit
+		hi := (i + 1) * deleteMultiLimit
 		if hi > len(keys) {
 			hi = len(keys)
 		}
