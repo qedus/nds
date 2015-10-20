@@ -40,6 +40,46 @@ func TestPutMulti(t *testing.T) {
 	}
 }
 
+func TestPutMultiError(t *testing.T) {
+	c, closeFunc := NewContext(t)
+	defer closeFunc()
+
+	expectedErrs := appengine.MultiError{
+		nil,
+		errors.New("expected error"),
+	}
+
+	nds.SetDatastorePutMulti(func(c context.Context,
+		keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
+		return keys, expectedErrs
+	})
+	defer nds.SetDatastorePutMulti(datastore.PutMulti)
+
+	keys := []*datastore.Key{
+		datastore.NewKey(c, "Test", "", 1, nil),
+		datastore.NewKey(c, "Test", "", 2, nil),
+	}
+
+	type TestEntity struct {
+		Value int
+	}
+	entities := []TestEntity{
+		{1},
+		{2},
+	}
+
+	_, err := nds.PutMulti(c, keys, entities)
+	me, ok := err.(appengine.MultiError)
+	if !ok {
+		t.Fatal("expected appengine.MultiError")
+	}
+	for i, e := range me {
+		if e != expectedErrs[i] {
+			t.Fatal("error incorrect")
+		}
+	}
+}
+
 func TestPutMultiNoPropertyList(t *testing.T) {
 	c, closeFunc := NewContext(t)
 	defer closeFunc()

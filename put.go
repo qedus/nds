@@ -103,7 +103,13 @@ func PutMulti(c context.Context,
 func Put(c context.Context,
 	key *datastore.Key, val interface{}) (*datastore.Key, error) {
 
-	keys, err := PutMulti(c, []*datastore.Key{key}, []interface{}{val})
+	keys := []*datastore.Key{key}
+	vals := []interface{}{val}
+	if err := checkMultiArgs(keys, reflect.ValueOf(vals)); err != nil {
+		return nil, err
+	}
+
+	keys, err := putMulti(c, keys, vals)
 	switch e := err.(type) {
 	case nil:
 		return keys[0], nil
@@ -138,6 +144,16 @@ func putMulti(c context.Context,
 		return nil, err
 	}
 
+	defer func() {
+		if _, ok := transactionFromContext(c); !ok {
+			// Remove the locks.
+			if err := memcacheDeleteMulti(memcacheCtx,
+				lockMemcacheKeys); err != nil {
+				log.Warningf(c, "putMulti memcache.DeleteMulti %s", err)
+			}
+		}
+	}()
+
 	if tx, ok := transactionFromContext(c); ok {
 		tx.Lock()
 		tx.lockMemcacheItems = append(tx.lockMemcacheItems,
@@ -149,17 +165,5 @@ func putMulti(c context.Context,
 	}
 
 	// Save to the datastore.
-	dsKeys, err := datastorePutMulti(c, keys, vals)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := transactionFromContext(c); !ok {
-		// Remove the locks.
-		if err := memcacheDeleteMulti(memcacheCtx,
-			lockMemcacheKeys); err != nil {
-			log.Warningf(c, "putMulti memcache.DeleteMulti %s", err)
-		}
-	}
-	return dsKeys, nil
+	return datastorePutMulti(c, keys, vals)
 }
