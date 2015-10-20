@@ -32,16 +32,11 @@ func PutMulti(c context.Context,
 		return nil, err
 	}
 
-	wg := sync.WaitGroup{}
-
 	callCount := (len(keys)-1)/putMultiLimit + 1
 	putKeys := make([][]*datastore.Key, callCount)
 	errs := make([]error, callCount)
-	call := func(i int, keys []*datastore.Key, vals reflect.Value) {
-		putKeys[i], errs[i] = putMulti(c, keys, vals.Interface())
-		wg.Done()
-	}
 
+	var wg sync.WaitGroup
 	wg.Add(callCount)
 	for i := 0; i < callCount; i++ {
 		lo := i * putMultiLimit
@@ -49,11 +44,11 @@ func PutMulti(c context.Context,
 		if hi > len(keys) {
 			hi = len(keys)
 		}
-		if i == callCount-1 {
-			call(i, keys[lo:hi], v.Slice(lo, hi))
-		} else {
-			go call(i, keys[lo:hi], v.Slice(lo, hi))
-		}
+
+		go func(i int, keys []*datastore.Key, vals reflect.Value) {
+			putKeys[i], errs[i] = putMulti(c, keys, vals.Interface())
+			wg.Done()
+		}(i, keys[lo:hi], v.Slice(lo, hi))
 	}
 	wg.Wait()
 

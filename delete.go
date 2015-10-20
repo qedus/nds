@@ -18,15 +18,11 @@ const deleteMultiLimit = 500
 // 500 entities per request by calling the datastore as many times as required
 // to put all the keys. It does this efficiently and concurrently.
 func DeleteMulti(c context.Context, keys []*datastore.Key) error {
-	wg := sync.WaitGroup{}
 
 	callCount := (len(keys)-1)/deleteMultiLimit + 1
 	errs := make([]error, callCount)
-	call := func(i int, keys []*datastore.Key) {
-		errs[i] = deleteMulti(c, keys)
-		wg.Done()
-	}
 
+	var wg sync.WaitGroup
 	wg.Add(callCount)
 	for i := 0; i < callCount; i++ {
 		lo := i * deleteMultiLimit
@@ -35,11 +31,10 @@ func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 			hi = len(keys)
 		}
 
-		if i == callCount-1 {
-			call(i, keys[lo:hi])
-		} else {
-			go call(i, keys[lo:hi])
-		}
+		go func(i int, keys []*datastore.Key) {
+			errs[i] = deleteMulti(c, keys)
+			wg.Done()
+		}(i, keys[lo:hi])
 	}
 	wg.Wait()
 
