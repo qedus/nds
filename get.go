@@ -86,7 +86,7 @@ func GetMulti(c context.Context,
 		return nil
 	}
 
-	return groupErrs(errs, len(keys), getMultiLimit)
+	return groupErrors(errs, len(keys), getMultiLimit)
 }
 
 // Get loads the entity stored for key into val, which must be a struct pointer.

@@ -42,7 +42,7 @@ func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 		return nil
 	}
 
-	return groupErrs(errs, len(keys), deleteMultiLimit)
+	return groupErrors(errs, len(keys), deleteMultiLimit)
 }
 
 // Delete deletes the entity for the given key.

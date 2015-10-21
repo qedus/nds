@@ -173,7 +173,7 @@ func isErrorsNil(errs []error) bool {
 	return true
 }
 
-func groupErrs(errs []error, total, limit int) error {
+func groupErrors(errs []error, total, limit int) error {
 	groupedErrs := make(appengine.MultiError, total)
 	for i, err := range errs {
 		lo := i * limit
