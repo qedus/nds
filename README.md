@@ -1,6 +1,6 @@
 # nds
 
-[![Build Status](https://travis-ci.org/qedus/nds.svg?branch=master)](https://travis-ci.org/qedus/nds) [![Coverage Status](https://coveralls.io/repos/qedus/nds/badge.png?branch=master)](https://coveralls.io/r/qedus/nds?branch=master) [![GoDoc](https://godoc.org/github.com/qedus/nds?status.png)](https://godoc.org/github.com/qedus/nds)
+[![Build Status](https://travis-ci.org/qedus/nds.svg?branch=master)](https://travis-ci.org/qedus/nds) [![Coverage Status](https://coveralls.io/repos/github/qedus/nds/badge.svg?branch=master)](https://coveralls.io/github/qedus/nds?branch=master) [![GoDoc](https://godoc.org/github.com/qedus/nds?status.png)](https://godoc.org/github.com/qedus/nds)
 
 Package `github.com/qedus/nds` is a datastore API for the Google App Engine (GAE) [Go Runtime Environment](https://developers.google.com/appengine/docs/go/) that uses memcache to cache all datastore requests. It is compatible with both Classic and Managed VM products. This package guarantees strong cache consistency when using `nds.Get*` and `nds.Put*`, meaning you will never get data from a stale cache.
 
