@@ -155,7 +155,7 @@ func TestPutMultiLockFailure(t *testing.T) {
 	}()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
-	vals := []testEntity{testEntity{42}}
+	vals := []testEntity{{42}}
 
 	if _, err := nds.PutMulti(c, keys, vals); err == nil {
 		t.Fatal("expected nds.PutMulti error")
@@ -180,7 +180,7 @@ func TestPutMultiUnlockMemcacheSuccess(t *testing.T) {
 	}()
 
 	keys := []*datastore.Key{datastore.NewKey(c, "Test", "", 1, nil)}
-	vals := []testEntity{testEntity{42}}
+	vals := []testEntity{{42}}
 
 	if _, err := nds.PutMulti(c, keys, vals); err != nil {
 		t.Fatal(err)

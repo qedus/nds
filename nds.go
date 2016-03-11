@@ -22,7 +22,7 @@ const (
 	memcachePrefix = "NDS1:"
 
 	// memcacheLockTime is the maximum length of time a memcache lock will be
-	// held for. 32 seconds is choosen as 30 seconds is the maximum amount of
+	// held for. 32 seconds is chosen as 30 seconds is the maximum amount of
 	// time an underlying datastore call will retry even if the API reports a
 	// success to the user.
 	memcacheLockTime = 32 * time.Second
