@@ -256,7 +256,7 @@ func TestGetMultiNoErrors(t *testing.T) {
 		}
 
 		respEntities := []testEntity{}
-		for _ = range keys {
+		for range keys {
 			respEntities = append(respEntities, testEntity{})
 		}
 

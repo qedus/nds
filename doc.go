@@ -1,5 +1,5 @@
 /*
-Package nds a Go datastore API for Google App Engine that caches datastore
+Package nds is a Go datastore API for Google App Engine that caches datastore
 calls in memcache in a strongly consistent manner. This often has the effect
 of making your app faster as memcache access is often 10x faster than datastore
 access. It can also make your app cheaper to run as memcache calls are free.
