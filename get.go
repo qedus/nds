@@ -2,8 +2,11 @@ package nds
 
 import (
 	"bytes"
+	"encoding/binary"
+	"math/rand"
 	"reflect"
 	"sync"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
@@ -224,6 +227,22 @@ func loadMemcache(c context.Context, cacheItems []cacheItem) {
 			}
 		}
 	}
+}
+
+// itemLock creates a pseudorandom memcache lock value that enables each call of
+// Get/GetMulti to determine if a lock retrieved from memcache is the one it
+// created. This is only important when multiple calls of Get/GetMulti are
+// performed concurrently for the same previously uncached entity.
+func itemLock() []byte {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, rand.Uint32())
+	return b
+}
+
+func init() {
+	// Seed the pseudorandom number generator to reduce the chance of itemLock
+	// collisions.
+	rand.Seed(time.Now().UnixNano())
 }
 
 func lockMemcache(c context.Context, cacheItems []cacheItem) {

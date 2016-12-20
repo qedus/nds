@@ -3,11 +3,9 @@ package nds
 import (
 	"bytes"
 	"crypto/sha1"
-	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
 	"errors"
-	"math/rand"
 	"reflect"
 	"time"
 
@@ -71,12 +69,6 @@ func init() {
 	gob.Register(&datastore.Key{})
 	gob.Register(appengine.BlobKey(""))
 	gob.Register(appengine.GeoPoint{})
-}
-
-func itemLock() []byte {
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, rand.Uint32())
-	return b
 }
 
 func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
