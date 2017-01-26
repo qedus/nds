@@ -137,22 +137,53 @@ func unmarshalPropertyList(data []byte, pl *datastore.PropertyList) error {
 	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(pl)
 }
 
+type valueType int
+
+const (
+	valueTypeInvalid valueType = iota
+	valueTypePropertyLoadSaver
+	valueTypeStruct
+	valueTypeStructPtr
+	valueTypeInterface
+)
+
+func checkValueType(val reflect.Value) valueType {
+
+	valType := val.Type()
+	if reflect.PtrTo(valType).Implements(typeOfPropertyLoadSaver) {
+		return valueTypePropertyLoadSaver
+	}
+
+	switch valType.Kind() {
+	case reflect.Struct:
+		return valueTypeStruct
+	case reflect.Interface:
+		return valueTypeInterface
+	case reflect.Ptr:
+		valType = valType.Elem()
+		if valType.Kind() == reflect.Struct {
+			return valueTypeStructPtr
+		}
+	}
+	return valueTypeInvalid
+}
+
 func setValue(val reflect.Value, pl datastore.PropertyList) error {
 
-	if reflect.PtrTo(val.Type()).Implements(typeOfPropertyLoadSaver) {
+	valType := checkValueType(val)
+
+	if valType == valueTypePropertyLoadSaver || valType == valueTypeStruct {
 		val = val.Addr()
+	}
+
+	if valType == valueTypeStructPtr && val.IsNil() {
+		val.Set(reflect.New(val.Type().Elem()))
 	}
 
 	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
 		return pls.Load(pl)
 	}
 
-	if val.Kind() == reflect.Struct {
-		val = val.Addr()
-	}
-	if val.Kind() == reflect.Ptr && val.Type().Elem().Kind() == reflect.Struct && val.IsNil() {
-		val.Set(reflect.New(val.Type().Elem()))
-	}
 	return datastore.LoadStruct(val.Interface(), pl)
 }
 

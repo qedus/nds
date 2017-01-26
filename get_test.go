@@ -1214,3 +1214,55 @@ func TestGetMultiPaths(t *testing.T) {
 		t.Log("End", test.description)
 	}
 }
+
+type loadSaveStruct struct {
+	Value int64
+}
+
+func (lss *loadSaveStruct) Save() ([]datastore.Property, error) {
+	return []datastore.Property{
+		datastore.Property{
+			Name:     "Val",
+			Value:    lss.Value,
+			NoIndex:  true,
+			Multiple: false,
+		},
+	}, nil
+}
+
+func (lss *loadSaveStruct) Load(properties []datastore.Property) error {
+
+	for _, p := range properties {
+		if p.Name == "Val" {
+			lss.Value = p.Value.(int64)
+		}
+	}
+	return nil
+}
+
+func TestPropertyLoadSaver(t *testing.T) {
+	ctx, closeFunc := NewContext(t)
+	defer closeFunc()
+
+	keys := []*datastore.Key{
+		datastore.NewIncompleteKey(ctx, "Entity", nil),
+	}
+	entities := []*loadSaveStruct{
+		&loadSaveStruct{
+			Value: 23,
+		},
+	}
+	keys, err := nds.PutMulti(ctx, keys, entities)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entities = make([]*loadSaveStruct, 1)
+	if err := nds.GetMulti(ctx, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	if entities[0].Value != 23 {
+		t.Fatal("expected another value")
+	}
+}
