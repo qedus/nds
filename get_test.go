@@ -1266,3 +1266,16 @@ func TestPropertyLoadSaver(t *testing.T) {
 		t.Fatal("expected another value")
 	}
 }
+
+func TestUnsupportedValueType(t *testing.T) {
+	ctx, closeFunc := NewContext(t)
+	defer closeFunc()
+
+	keys := []*datastore.Key{
+		datastore.NewIncompleteKey(ctx, "Entity", nil),
+	}
+	entities := make([]int, 1)
+	if err := nds.GetMulti(ctx, keys, entities); err == nil {
+		t.Fatal("expected unsupported value error")
+	}
+}
