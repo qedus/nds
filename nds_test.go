@@ -555,7 +555,7 @@ func TestLoadSaveStruct(t *testing.T) {
 	for i, test := range tests {
 		prop := pl[i]
 		if prop.Name != test.name {
-			t.Fatal("incorrect name")
+			t.Fatalf("incorrect name expected %s, got %s", prop.Name, test.name)
 		}
 		if prop.Value != test.value {
 			t.Fatalf("incorrect value required %+v got %+v",

@@ -28,7 +28,7 @@ func PutMulti(c context.Context,
 	}
 
 	v := reflect.ValueOf(vals)
-	if err := checkMultiArgs(keys, v); err != nil {
+	if err := checkKeysValues(keys, v); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +100,7 @@ func Put(c context.Context,
 
 	keys := []*datastore.Key{key}
 	vals := []interface{}{val}
-	if err := checkMultiArgs(keys, reflect.ValueOf(vals)); err != nil {
+	if err := checkKeysValues(keys, reflect.ValueOf(vals)); err != nil {
 		return nil, err
 	}
 

@@ -71,13 +71,43 @@ func init() {
 	gob.Register(appengine.GeoPoint{})
 }
 
-func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
-	if v.Kind() != reflect.Slice {
-		return errors.New("nds: vals is not a slice")
+type valueType int
+
+const (
+	valueTypeInvalid valueType = iota
+	valueTypePropertyLoadSaver
+	valueTypeStruct
+	valueTypeStructPtr
+	valueTypeInterface
+)
+
+func checkValueType(valType reflect.Type) valueType {
+
+	if reflect.PtrTo(valType).Implements(typeOfPropertyLoadSaver) {
+		return valueTypePropertyLoadSaver
 	}
 
-	if len(keys) != v.Len() {
-		return errors.New("nds: keys and vals slices have different length")
+	switch valType.Kind() {
+	case reflect.Struct:
+		return valueTypeStruct
+	case reflect.Interface:
+		return valueTypeInterface
+	case reflect.Ptr:
+		valType = valType.Elem()
+		if valType.Kind() == reflect.Struct {
+			return valueTypeStructPtr
+		}
+	}
+	return valueTypeInvalid
+}
+
+func checkKeysValues(keys []*datastore.Key, values reflect.Value) error {
+	if values.Kind() != reflect.Slice {
+		return errors.New("nds: valus is not a slice")
+	}
+
+	if len(keys) != values.Len() {
+		return errors.New("nds: keys and values slices have different length")
 	}
 
 	isNilErr, nilErr := false, make(appengine.MultiError, len(keys))
@@ -91,25 +121,14 @@ func checkMultiArgs(keys []*datastore.Key, v reflect.Value) error {
 		return nilErr
 	}
 
-	if v.Type() == typeOfPropertyList {
+	if values.Type() == typeOfPropertyList {
 		return errors.New("nds: PropertyList not supported")
 	}
 
-	elemType := v.Type().Elem()
-	if reflect.PtrTo(elemType).Implements(typeOfPropertyLoadSaver) {
-		return nil
+	if ty := checkValueType(values.Type().Elem()); ty == valueTypeInvalid {
+		return errors.New("nds: unsupported vals type")
 	}
-
-	switch elemType.Kind() {
-	case reflect.Struct, reflect.Interface:
-		return nil
-	case reflect.Ptr:
-		elemType = elemType.Elem()
-		if elemType.Kind() == reflect.Struct {
-			return nil
-		}
-	}
-	return errors.New("nds: unsupported vals type")
+	return nil
 }
 
 func createMemcacheKey(key *datastore.Key) string {
@@ -137,40 +156,9 @@ func unmarshalPropertyList(data []byte, pl *datastore.PropertyList) error {
 	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(pl)
 }
 
-type valueType int
-
-const (
-	valueTypeInvalid valueType = iota
-	valueTypePropertyLoadSaver
-	valueTypeStruct
-	valueTypeStructPtr
-	valueTypeInterface
-)
-
-func checkValueType(val reflect.Value) valueType {
-
-	valType := val.Type()
-	if reflect.PtrTo(valType).Implements(typeOfPropertyLoadSaver) {
-		return valueTypePropertyLoadSaver
-	}
-
-	switch valType.Kind() {
-	case reflect.Struct:
-		return valueTypeStruct
-	case reflect.Interface:
-		return valueTypeInterface
-	case reflect.Ptr:
-		valType = valType.Elem()
-		if valType.Kind() == reflect.Struct {
-			return valueTypeStructPtr
-		}
-	}
-	return valueTypeInvalid
-}
-
 func setValue(val reflect.Value, pl datastore.PropertyList) error {
 
-	valType := checkValueType(val)
+	valType := checkValueType(val.Type())
 
 	if valType == valueTypePropertyLoadSaver || valType == valueTypeStruct {
 		val = val.Addr()

@@ -58,7 +58,7 @@ func GetMulti(c context.Context,
 	keys []*datastore.Key, vals interface{}) error {
 
 	v := reflect.ValueOf(vals)
-	if err := checkMultiArgs(keys, v); err != nil {
+	if err := checkKeysValues(keys, v); err != nil {
 		return err
 	}
 
