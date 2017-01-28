@@ -138,12 +138,12 @@ type cacheItem struct {
 	state cacheState
 }
 
-// getMulti attempts to get entities from, memcache, then the datastore.
-// datastore. It also tries to replenish memcache if needed available. It does
-// this in such a way that GetMulti will never get stale results even if the
-// function, datastore or server fails at any point. The caching strategy is
-// borrowed from Python ndb with some improvements that eliminate some
-// consistency issues surrounding ndb, including http://goo.gl/3ByVlA.
+// getMulti attempts to get entities from, memcache, then the datastore. It also
+// tries to replenish memcache if needed available. It does this in such a way
+// that GetMulti will never get stale results even if the function, datastore or
+// server fails at any point. The caching strategy is borrowed from Python ndb
+// with improvements that eliminate some consistency issues surrounding ndb,
+// including http://goo.gl/3ByVlA.
 func getMulti(c context.Context,
 	keys []*datastore.Key, vals reflect.Value) error {
 
