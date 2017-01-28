@@ -526,59 +526,6 @@ func TestRunInTransaction(t *testing.T) {
 	}
 }
 
-func TestLoadSaveStruct(t *testing.T) {
-	type testEntity struct {
-		IntValue      int `datastore:",noindex"`
-		StringValue   string
-		MultipleValue []int64
-	}
-
-	te := testEntity{10, "ten", []int64{1, 2, 3}}
-	pl, err := datastore.SaveStruct(&te)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := []struct {
-		name     string
-		value    interface{}
-		noIndex  bool
-		multiple bool
-	}{
-		{"IntValue", int64(10), true, false},
-		{"StringValue", "ten", false, false},
-		{"MultipleValue", int64(1), false, true},
-		{"MultipleValue", int64(2), false, true},
-		{"MultipleValue", int64(3), false, true},
-	}
-
-	for i, test := range tests {
-		prop := pl[i]
-		if prop.Name != test.name {
-			t.Fatalf("incorrect name expected %s, got %s", prop.Name, test.name)
-		}
-		if prop.Value != test.value {
-			t.Fatalf("incorrect value required %+v got %+v",
-				prop.Value, test.value)
-		}
-		if prop.NoIndex != test.noIndex {
-			t.Fatal("incorrect no index")
-		}
-		if prop.Multiple != test.multiple {
-			t.Fatal("incorrect multiple flag")
-		}
-	}
-
-	loadTestEntity := testEntity{}
-	if err := datastore.LoadStruct(&loadTestEntity, pl); err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(te, loadTestEntity) {
-		t.Fatal("entities not equal")
-	}
-}
-
 func TestMarshalUnmarshalPropertyList(t *testing.T) {
 	c, closeFunc := NewContext(t)
 	defer closeFunc()
