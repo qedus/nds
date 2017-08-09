@@ -1279,3 +1279,46 @@ func TestUnsupportedValueType(t *testing.T) {
 		t.Fatal("expected unsupported value error")
 	}
 }
+
+func TestGetMultiFieldMismatch(t *testing.T) {
+	c, closeFunc := NewContext(t)
+	defer closeFunc()
+
+	type testEntity struct {
+		IntVal  int64
+		IntVal2 int64
+	}
+
+	type testEntityLean struct {
+		IntVal int64
+	}
+
+	keys := []*datastore.Key{}
+	entities := []testEntity{}
+	for i := int64(1); i < 3; i++ {
+		keys = append(keys, datastore.NewKey(c, "Entity", "", i, nil))
+		entities = append(entities, testEntity{i, i})
+	}
+
+	if _, err := nds.PutMulti(c, keys, entities); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get from datastore using nds.
+	ndsResponse := make([]testEntityLean, len(keys))
+	ndsErr := nds.GetMulti(c, keys, ndsResponse)
+
+	// Get from datastore using google api
+	dsResponse := make([]testEntityLean, len(keys))
+	dsErr := datastore.GetMulti(c, keys, dsResponse)
+
+	if ndsErr.Error() != dsErr.Error() {
+		t.Fatal("Errors are not equal")
+	}
+
+	for i := int64(0); i < 2; i++ {
+		if ndsResponse[i].IntVal != dsResponse[i].IntVal {
+			t.Fatalf("IntVals are not equal %d %d", ndsResponse[i].IntVal, dsResponse[i].IntVal)
+		}
+	}
+}
