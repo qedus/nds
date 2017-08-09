@@ -356,7 +356,7 @@ func loadDatastore(c context.Context, cacheItems []cacheItem,
 			pl := vals[i]
 			val := cacheItems[index].val
 			if err := setValue(val, pl); err != nil {
-				return err
+				cacheItems[index].err = err
 			}
 
 			if cacheItems[index].state == internalLock {
