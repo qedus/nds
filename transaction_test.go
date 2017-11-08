@@ -7,7 +7,7 @@ import (
 	"github.com/qedus/nds"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
+	"cloud.google.com/go/datastore"
 )
 
 func TestTransactionOptions(t *testing.T) {

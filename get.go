@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"log"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 // getMultiLimit is the App Engine datastore limit for the maximum number
@@ -61,7 +60,6 @@ func GetMulti(c context.Context,
 	if err := checkKeysValues(keys, v); err != nil {
 		return err
 	}
-
 	callCount := (len(keys)-1)/getMultiLimit + 1
 	errs := make([]error, callCount)
 
@@ -111,7 +109,7 @@ func Get(c context.Context, key *datastore.Key, val interface{}) error {
 	}
 
 	err := GetMulti(c, []*datastore.Key{key}, []interface{}{val})
-	if me, ok := err.(appengine.MultiError); ok {
+	if me, ok := err.(datastore.MultiError); ok {
 		return me[0]
 	}
 	return err
@@ -170,7 +168,7 @@ func getMulti(c context.Context,
 
 	saveMemcache(memcacheCtx, cacheItems)
 
-	me, errsNil := make(appengine.MultiError, len(cacheItems)), true
+	me, errsNil := make(datastore.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {
 		if cacheItem.err != nil {
 			me[i] = cacheItem.err
@@ -196,7 +194,7 @@ func loadMemcache(c context.Context, cacheItems []cacheItem) {
 		for i := range cacheItems {
 			cacheItems[i].state = externalLock
 		}
-		log.Warningf(c, "nds:loadMemcache GetMulti %s", err)
+		log.Printf("WARNING: nds:loadMemcache GetMulti %s", err)
 		return
 	}
 
@@ -211,18 +209,18 @@ func loadMemcache(c context.Context, cacheItems []cacheItem) {
 			case entityItem:
 				pl := datastore.PropertyList{}
 				if err := unmarshal(item.Value, &pl); err != nil {
-					log.Warningf(c, "nds:loadMemcache unmarshal %s", err)
+					log.Printf("WARNING: nds:loadMemcache unmarshal %s", err)
 					cacheItems[i].state = externalLock
 					break
 				}
 				if err := setValue(cacheItems[i].val, pl); err == nil {
 					cacheItems[i].state = done
 				} else {
-					log.Warningf(c, "nds:loadMemcache setValue %s", err)
+					log.Printf("WARNING: nds:loadMemcache setValue %s", err)
 					cacheItems[i].state = externalLock
 				}
 			default:
-				log.Warningf(c, "nds:loadMemcache unknown item.Flags %d", item.Flags)
+				log.Printf("WARNING: nds:loadMemcache unknown item.Flags %d", item.Flags)
 				cacheItems[i].state = externalLock
 			}
 		}
@@ -266,7 +264,7 @@ func lockMemcache(c context.Context, cacheItems []cacheItem) {
 
 	// We don't care if there are errors here.
 	if err := memcacheAddMulti(c, lockItems); err != nil {
-		log.Warningf(c, "nds:lockMemcache AddMulti %s", err)
+		log.Printf("WARNING: nds:lockMemcache AddMulti %s", err)
 	}
 
 	// Get the items again so we can use CAS when updating the cache.
@@ -279,7 +277,7 @@ func lockMemcache(c context.Context, cacheItems []cacheItem) {
 				cacheItems[i].state = externalLock
 			}
 		}
-		log.Warningf(c, "nds:lockMemcache GetMulti %s", err)
+		log.Printf("WARNING: nds:lockMemcache GetMulti %s", err)
 		return
 	}
 
@@ -301,18 +299,18 @@ func lockMemcache(c context.Context, cacheItems []cacheItem) {
 				case entityItem:
 					pl := datastore.PropertyList{}
 					if err := unmarshal(item.Value, &pl); err != nil {
-						log.Warningf(c, "nds:lockMemcache unmarshal %s", err)
+						log.Printf("WARNING: nds:lockMemcache unmarshal %s", err)
 						cacheItems[i].state = externalLock
 						break
 					}
 					if err := setValue(cacheItems[i].val, pl); err == nil {
 						cacheItems[i].state = done
 					} else {
-						log.Warningf(c, "nds:lockMemcache setValue %s", err)
+						log.Printf("WARNING: nds:lockMemcache setValue %s", err)
 						cacheItems[i].state = externalLock
 					}
 				default:
-					log.Warningf(c, "nds:lockMemcache unknown item.Flags %d",
+					log.Printf("WARNING: nds:lockMemcache unknown item.Flags %d",
 						item.Flags)
 					cacheItems[i].state = externalLock
 				}
@@ -341,10 +339,10 @@ func loadDatastore(c context.Context, cacheItems []cacheItem,
 		}
 	}
 
-	var me appengine.MultiError
+	var me datastore.MultiError
 	if err := datastoreGetMulti(c, keys, vals); err == nil {
-		me = make(appengine.MultiError, len(keys))
-	} else if e, ok := err.(appengine.MultiError); ok {
+		me = make(datastore.MultiError, len(keys))
+	} else if e, ok := err.(datastore.MultiError); ok {
 		me = e
 	} else {
 		return err
@@ -366,7 +364,7 @@ func loadDatastore(c context.Context, cacheItems []cacheItem,
 					cacheItems[index].item.Value = data
 				} else {
 					cacheItems[index].state = externalLock
-					log.Warningf(c, "nds:loadDatastore marshal %s", err)
+					log.Printf("WARNING: nds:loadDatastore marshal %s", err)
 				}
 			}
 		case datastore.ErrNoSuchEntity:
@@ -394,6 +392,6 @@ func saveMemcache(c context.Context, cacheItems []cacheItem) {
 	}
 
 	if err := memcacheCompareAndSwapMulti(c, saveItems); err != nil {
-		log.Warningf(c, "nds:saveMemcache CompareAndSwapMulti %s", err)
+		log.Printf("WARNING: nds:saveMemcache CompareAndSwapMulti %s", err)
 	}
 }

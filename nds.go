@@ -10,9 +10,8 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"fmt"
 )
 
 const (
@@ -23,7 +22,7 @@ const (
 	// held for. 32 seconds is chosen as 30 seconds is the maximum amount of
 	// time an underlying datastore call will retry even if the API reports a
 	// success to the user.
-	memcacheLockTime = 32 * time.Second
+	memcacheLockTime = 32
 
 	// memcacheMaxKeySize is the maximum size a memcache item key can be. Keys
 	// greater than this size are automatically hashed to a smaller size.
@@ -39,15 +38,16 @@ var (
 // The variables in this block are here so that we can test all error code
 // paths by substituting them with error producing ones.
 var (
-	datastoreDeleteMulti = datastore.DeleteMulti
-	datastoreGetMulti    = datastore.GetMulti
-	datastorePutMulti    = datastore.PutMulti
+	dsClient, _ = datastore.NewClient(context.Background(), "streamrail-qa") // TODO: put in init func
+	datastoreDeleteMulti = dsClient.DeleteMulti
+	datastoreGetMulti    = dsClient.GetMulti
+	datastorePutMulti    = dsClient.PutMulti
 
-	memcacheAddMulti            = memcache.AddMulti
-	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
-	memcacheDeleteMulti         = memcache.DeleteMulti
-	memcacheGetMulti            = memcache.GetMulti
-	memcacheSetMulti            = memcache.SetMulti
+	//memcacheAddMulti            = memcacheAddMulti
+	//memcacheCompareAndSwapMulti = memcacheCompareAndSwapMulti
+	//memcacheDeleteMulti         = memcacheDeleteMulti
+	//memcacheGetMulti            = memcacheGetMulti
+	//memcacheSetMulti            = memcacheSetMulti
 
 	marshal   = marshalPropertyList
 	unmarshal = unmarshalPropertyList
@@ -63,12 +63,24 @@ const (
 	lockItem
 )
 
+func InitNDS(c context.Context, memcacheAddr, datastoreProjectID string) error {
+	var err error
+	if dsClient, err = datastore.NewClient(c, datastoreProjectID); err != nil {
+		return fmt.Errorf("failed to create datastore client")
+	}
+	initMemCache(memcacheAddr)
+	return nil
+}
+
 func init() {
+	type GeoPoint struct {
+		Lat, Lng float64
+	}
 	gob.Register(time.Time{})
-	gob.Register(datastore.ByteString{})
+	gob.Register(new([]byte))
 	gob.Register(&datastore.Key{})
-	gob.Register(appengine.BlobKey(""))
-	gob.Register(appengine.GeoPoint{})
+	gob.Register("")
+	gob.Register(GeoPoint{})
 }
 
 type valueType int
@@ -110,7 +122,7 @@ func checkKeysValues(keys []*datastore.Key, values reflect.Value) error {
 		return errors.New("nds: keys and values slices have different length")
 	}
 
-	isNilErr, nilErr := false, make(appengine.MultiError, len(keys))
+	isNilErr, nilErr := false, make(datastore.MultiError, len(keys))
 	for i, key := range keys {
 		if key == nil {
 			isNilErr = true
@@ -141,7 +153,7 @@ func createMemcacheKey(key *datastore.Key) string {
 }
 
 func memcacheContext(c context.Context) (context.Context, error) {
-	return appengine.Namespace(c, memcacheNamespace)
+	return c, nil
 }
 
 func marshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
@@ -185,14 +197,14 @@ func isErrorsNil(errs []error) bool {
 }
 
 func groupErrors(errs []error, total, limit int) error {
-	groupedErrs := make(appengine.MultiError, total)
+	groupedErrs := make(datastore.MultiError, total)
 	for i, err := range errs {
 		lo := i * limit
 		hi := (i + 1) * limit
 		if hi > total {
 			hi = total
 		}
-		if me, ok := err.(appengine.MultiError); ok {
+		if me, ok := err.(datastore.MultiError); ok {
 			copy(groupedErrs[lo:hi], me)
 		} else if err != nil {
 			for j := lo; j < hi; j++ {

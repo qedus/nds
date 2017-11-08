@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 func TestGetMultiStruct(t *testing.T) {
@@ -894,7 +894,7 @@ func TestGetMultiPaths(t *testing.T) {
 			func(c context.Context,
 				keys []*datastore.Key, vals interface{}) error {
 
-				me := make(appengine.MultiError, len(keys))
+				me := make(datastore.MultiError, len(keys))
 				for i := range me {
 					me[i] = expectedErr
 				}
@@ -906,7 +906,7 @@ func TestGetMultiPaths(t *testing.T) {
 				nds.UnmarshalPropertyList,
 			},
 			[]error{
-				appengine.MultiError{expectedErr, expectedErr},
+				datastore.MultiError{expectedErr, expectedErr},
 			},
 		},
 		{
@@ -1078,7 +1078,7 @@ func TestGetMultiPaths(t *testing.T) {
 				nds.UnmarshalPropertyList,
 			},
 			[]error{
-				appengine.MultiError{
+				datastore.MultiError{
 					datastore.ErrNoSuchEntity,
 					datastore.ErrNoSuchEntity,
 				},
@@ -1174,16 +1174,16 @@ func TestGetMultiPaths(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			expectedMultiErr, isMultiErr := expectedErr.(appengine.MultiError)
+			expectedMultiErr, isMultiErr := expectedErr.(datastore.MultiError)
 
 			if isMultiErr {
-				me, ok := err.(appengine.MultiError)
+				me, ok := err.(datastore.MultiError)
 				if !ok {
-					t.Fatal("expected appengine.MultiError but got", err)
+					t.Fatal("expected datastore.MultiError but got", err)
 				}
 
 				if len(me) != len(expectedMultiErr) {
-					t.Fatal("appengine.MultiError length incorrect")
+					t.Fatal("datastore.MultiError length incorrect")
 				}
 
 				for i, e := range me {
