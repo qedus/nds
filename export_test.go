@@ -4,8 +4,8 @@ import (
 	"reflect"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 var (

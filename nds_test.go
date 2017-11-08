@@ -13,8 +13,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 func NewContext(t *testing.T) (context.Context, func()) {
@@ -185,10 +185,10 @@ func TestInterfaces(t *testing.T) {
 
 	entities = []interface{}{testEntity{}}
 	err = nds.GetMulti(c, keys, entities)
-	if me, ok := err.(appengine.MultiError); ok {
+	if me, ok := err.(datastore.MultiError); ok {
 
 		if len(me) != 1 {
-			t.Fatal("expected 1 appengine.MultiError")
+			t.Fatal("expected 1 datastore.MultiError")
 		}
 		if me[0] != datastore.ErrNoSuchEntity {
 			t.Fatal("expected datastore.ErrNoSuchEntity")
@@ -218,7 +218,7 @@ func TestGetMultiNoSuchEntity(t *testing.T) {
 		}
 
 		err := nds.GetMulti(c, keys, entities)
-		if me, ok := err.(appengine.MultiError); ok {
+		if me, ok := err.(datastore.MultiError); ok {
 			if len(me) != count {
 				t.Fatal("multi error length incorrect")
 			}
@@ -313,10 +313,10 @@ func TestGetMultiErrorMix(t *testing.T) {
 			t.Fatal("should be errors")
 		}
 
-		if me, ok := err.(appengine.MultiError); !ok {
-			t.Fatal("not appengine.MultiError")
+		if me, ok := err.(datastore.MultiError); !ok {
+			t.Fatal("not datastore.MultiError")
 		} else if len(me) != len(keys) {
-			t.Fatal("incorrect length appengine.MultiError")
+			t.Fatal("incorrect length datastore.MultiError")
 		}
 
 		// Check respEntities are in order.
@@ -326,7 +326,7 @@ func TestGetMultiErrorMix(t *testing.T) {
 					t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
 						entities[i].Val)
 				}
-			} else if me, ok := err.(appengine.MultiError); ok {
+			} else if me, ok := err.(datastore.MultiError); ok {
 				if me[i] != datastore.ErrNoSuchEntity {
 					t.Fatalf("incorrect error %+v, index %d, of %d",
 						me, i, count)
@@ -378,9 +378,9 @@ func TestMultiCache(t *testing.T) {
 		t.Fatal("should be errors")
 	}
 
-	me, ok := err.(appengine.MultiError)
+	me, ok := err.(datastore.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T, %s", err, err)
+		t.Fatalf("not an datastore.MultiError: %+T, %s", err, err)
 	}
 
 	// Check respEntities are in order.
@@ -411,9 +411,9 @@ func TestMultiCache(t *testing.T) {
 		t.Fatal("should be errors")
 	}
 
-	me, ok = err.(appengine.MultiError)
+	me, ok = err.(datastore.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %s", err)
+		t.Fatalf("not an datastore.MultiError: %s", err)
 	}
 
 	// Check respEntities are in order.
@@ -444,9 +444,9 @@ func TestMultiCache(t *testing.T) {
 		t.Fatal("should be errors")
 	}
 
-	me, ok = err.(appengine.MultiError)
+	me, ok = err.(datastore.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T", me)
+		t.Fatalf("not an datastore.MultiError: %+T", me)
 	}
 
 	// Check respEntities are in order.

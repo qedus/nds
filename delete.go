@@ -4,9 +4,8 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 // deleteMultiLimit is the App Engine datastore limit for the maximum number
@@ -48,7 +47,7 @@ func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 // Delete deletes the entity for the given key.
 func Delete(c context.Context, key *datastore.Key) error {
 	err := deleteMulti(c, []*datastore.Key{key})
-	if me, ok := err.(appengine.MultiError); ok {
+	if me, ok := err.(datastore.MultiError); ok {
 		return me[0]
 	}
 	return err

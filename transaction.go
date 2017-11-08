@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 var transactionKey = "used for *transaction"
@@ -23,23 +23,19 @@ func transactionFromContext(c context.Context) (*transaction, bool) {
 // RunInTransaction works just like datastore.RunInTransaction however it
 // interacts correctly with memcache. You should always use this method for
 // transactions if you are using the NDS package.
-func RunInTransaction(c context.Context, f func(tc context.Context) error,
-	opts *datastore.TransactionOptions) error {
-
-	return datastore.RunInTransaction(c, func(tc context.Context) error {
+func RunInTransaction(c context.Context, f func(tx *datastore.Transaction) error,
+	opts ...datastore.TransactionOption) (*datastore.Commit, error) {
+	return dsClient.RunInTransaction(c, func(t *datastore.Transaction) error {
 		tx := &transaction{}
-		tc = context.WithValue(tc, &transactionKey, tx)
-		if err := f(tc); err != nil {
+		tc := context.WithValue(c, &transactionKey, tx)
+		if err := f(t); err != nil {
 			return err
 		}
 
+		// TODO: check if needed
 		// tx.Unlock() is not called as the tx context should never be called
 		//again so we rather block than allow people to misuse the context.
 		tx.Lock()
-		memcacheCtx, err := memcacheContext(tc)
-		if err != nil {
-			return err
-		}
-		return memcacheSetMulti(memcacheCtx, tx.lockMemcacheItems)
-	}, opts)
+		return memcacheSetMulti(tc, tx.lockMemcacheItems)
+	}, opts...)
 }

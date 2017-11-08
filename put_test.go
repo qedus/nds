@@ -8,8 +8,8 @@ import (
 	"github.com/qedus/nds"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 func TestPutMulti(t *testing.T) {
@@ -44,7 +44,7 @@ func TestPutMultiError(t *testing.T) {
 	c, closeFunc := NewContext(t)
 	defer closeFunc()
 
-	expectedErrs := appengine.MultiError{
+	expectedErrs := datastore.MultiError{
 		nil,
 		errors.New("expected error"),
 	}
@@ -69,9 +69,9 @@ func TestPutMultiError(t *testing.T) {
 	}
 
 	_, err := nds.PutMulti(c, keys, entities)
-	me, ok := err.(appengine.MultiError)
+	me, ok := err.(datastore.MultiError)
 	if !ok {
-		t.Fatal("expected appengine.MultiError")
+		t.Fatal("expected datastore.MultiError")
 	}
 	for i, e := range me {
 		if e != expectedErrs[i] {
@@ -199,7 +199,7 @@ func TestPutDatastoreMultiError(t *testing.T) {
 
 	nds.SetDatastorePutMulti(func(c context.Context,
 		keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
-		return nil, appengine.MultiError{expectedErr}
+		return nil, datastore.MultiError{expectedErr}
 	})
 
 	defer func() {

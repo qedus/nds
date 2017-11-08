@@ -5,10 +5,9 @@ import (
 	"sync"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
+	"log"
 )
 
 // putMultiLimit is the App Engine datastore limit for the maximum number
@@ -66,14 +65,14 @@ func PutMulti(c context.Context,
 	}
 
 	groupedKeys := make([]*datastore.Key, len(keys))
-	groupedErrs := make(appengine.MultiError, len(keys))
+	groupedErrs := make(datastore.MultiError, len(keys))
 	for i, err := range errs {
 		lo := i * putMultiLimit
 		hi := (i + 1) * putMultiLimit
 		if hi > len(keys) {
 			hi = len(keys)
 		}
-		if me, ok := err.(appengine.MultiError); ok {
+		if me, ok := err.(datastore.MultiError); ok {
 			for j, e := range me {
 				if e == nil {
 					groupedKeys[lo+j] = putKeys[i][j]
@@ -108,7 +107,7 @@ func Put(c context.Context,
 	switch e := err.(type) {
 	case nil:
 		return keys[0], nil
-	case appengine.MultiError:
+	case datastore.MultiError:
 		return nil, e[0]
 	default:
 		return nil, err
@@ -144,7 +143,7 @@ func putMulti(c context.Context,
 			// Remove the locks.
 			if err := memcacheDeleteMulti(memcacheCtx,
 				lockMemcacheKeys); err != nil {
-				log.Warningf(c, "putMulti memcache.DeleteMulti %s", err)
+				log.Printf("WARNING: putMulti memcache.DeleteMulti %s", err)
 			}
 		}
 	}()

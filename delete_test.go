@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 func TestDeleteMulti(t *testing.T) {
@@ -50,7 +50,7 @@ func TestDeleteMulti(t *testing.T) {
 			t.Fatal("expect error")
 		}
 
-		me, ok := err.(appengine.MultiError)
+		me, ok := err.(datastore.MultiError)
 		if !ok {
 			t.Fatal("should be MultiError")
 		}
