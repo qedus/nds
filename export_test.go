@@ -1,11 +1,10 @@
 package nds
 
 import (
+	"context"
 	"reflect"
 
-	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
 )
 
 var (
@@ -15,42 +14,8 @@ var (
 	NoneItem   = noneItem
 	EntityItem = entityItem
 
-	MemcacheMaxKeySize = memcacheMaxKeySize
+	CacheMaxKeySize = cacheMaxKeySize
 )
-
-func SetMemcacheAddMulti(f func(c context.Context,
-	items []*memcache.Item) error) {
-	memcacheAddMulti = f
-}
-
-func SetMemcacheCompareAndSwapMulti(f func(c context.Context,
-	items []*memcache.Item) error) {
-	memcacheCompareAndSwapMulti = f
-}
-
-func SetMemcacheDeleteMulti(f func(c context.Context, keys []string) error) {
-	memcacheDeleteMulti = f
-}
-
-func SetMemcacheGetMulti(f func(c context.Context,
-	keys []string) (map[string]*memcache.Item, error)) {
-	memcacheGetMulti = f
-}
-
-func SetMemcacheSetMulti(f func(c context.Context,
-	items []*memcache.Item) error) {
-	memcacheSetMulti = f
-}
-
-func SetDatastorePutMulti(f func(c context.Context,
-	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error)) {
-	datastorePutMulti = f
-}
-
-func SetDatastoreGetMulti(f func(c context.Context,
-	keys []*datastore.Key, vals interface{}) error) {
-	datastoreGetMulti = f
-}
 
 func SetMarshal(f func(pl datastore.PropertyList) ([]byte, error)) {
 	marshal = f
@@ -60,14 +25,18 @@ func SetUnmarshal(f func(data []byte, pl *datastore.PropertyList) error) {
 	unmarshal = f
 }
 
-func SetValue(val reflect.Value, pl datastore.PropertyList) error {
-	return setValue(val, pl)
+func SetValue(val reflect.Value, pl datastore.PropertyList, key *datastore.Key) error {
+	return setValue(val, pl, key)
 }
 
-func CreateMemcacheKey(key *datastore.Key) string {
-	return createMemcacheKey(key)
+func CreateCacheKey(key *datastore.Key) string {
+	return createCacheKey(key)
 }
 
-func SetMemcacheNamespace(namespace string) {
-	memcacheNamespace = namespace
+func SetDatastorePutMultiHook(f func() error) {
+	putMultiHook = f
+}
+
+func SetDatastoreGetMultiHook(f func(c context.Context, keys []*datastore.Key, vals interface{}) error) {
+	getMultiHook = f
 }

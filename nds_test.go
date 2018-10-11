@@ -1,294 +1,496 @@
 package nds_test
 
 import (
+	"context"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"math/rand"
+	"os"
 	"reflect"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/qedus/nds"
+	"cloud.google.com/go/datastore"
 
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/aetest"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"github.com/qedus/nds"
+	"github.com/qedus/nds/cachers/memory"
 )
 
-func NewContext(t *testing.T) (context.Context, func()) {
-	c, closeFunc, err := aetest.NewContext()
-	if err != nil {
-		t.Fatal(err)
+var (
+	cachers = []cacherTestItem{
+		cacherTestItem{ctx: context.Background(), cacher: memory.NewCacher()},
 	}
-	return c, closeFunc
+	cachersGuard      sync.Mutex
+	errNotDefined     = errors.New("undefined")
+	appEnginePreHook  func()
+	appEnginePostHook func()
+)
+
+type cacherTestItem struct {
+	ctx    context.Context
+	cacher nds.Cacher
 }
 
-func TestPutGetDelete(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		IntVal int
-	}
-
-	// Check we set memcahce, put datastore and delete memcache.
-	seq := make(chan string, 3)
-	nds.SetMemcacheSetMulti(func(c context.Context,
-		items []*memcache.Item) error {
-		seq <- "memcache.SetMulti"
-		return memcache.SetMulti(c, items)
-	})
-	nds.SetDatastorePutMulti(func(c context.Context,
-		keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
-		seq <- "datastore.PutMulti"
-		return datastore.PutMulti(c, keys, vals)
-	})
-	nds.SetMemcacheDeleteMulti(func(c context.Context,
-		keys []string) error {
-		seq <- "memcache.DeleteMulti"
-		close(seq)
-		return memcache.DeleteMulti(c, keys)
-	})
-
-	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
-	key, err := nds.Put(c, incompleteKey, &testEntity{43})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	nds.SetMemcacheSetMulti(memcache.SetMulti)
-	nds.SetDatastorePutMulti(datastore.PutMulti)
-	nds.SetMemcacheDeleteMulti(memcache.DeleteMulti)
-
-	if s := <-seq; s != "memcache.SetMulti" {
-		t.Fatal("memcache.SetMulti not", s)
-	}
-	if s := <-seq; s != "datastore.PutMulti" {
-		t.Fatal("datastore.PutMulti not", s)
-	}
-	if s := <-seq; s != "memcache.DeleteMulti" {
-		t.Fatal("memcache.DeleteMulti not", s)
-	}
-	// Check chan is closed.
-	<-seq
-
-	if key.Incomplete() {
-		t.Fatal("Key is incomplete")
-	}
-
-	te := &testEntity{}
-	if err := nds.Get(c, key, te); err != nil {
-		t.Fatal(err)
-	}
-
-	if te.IntVal != 43 {
-		t.Fatal("te.Val != 43", te.IntVal)
-	}
-
-	// Get from cache.
-	te = &testEntity{}
-	if err := nds.Get(c, key, te); err != nil {
-		t.Fatal(err)
-	}
-
-	if te.IntVal != 43 {
-		t.Fatal("te.Val != 43", te.IntVal)
-	}
-
-	// Change value.
-	if _, err := nds.Put(c, key, &testEntity{64}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Get from cache.
-	te = &testEntity{}
-	if err := nds.Get(c, key, te); err != nil {
-		t.Fatal(err)
-	}
-
-	if te.IntVal != 64 {
-		t.Fatal("te.Val != 64", te.IntVal)
-	}
-
-	if err := nds.Delete(c, key); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := nds.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
-		t.Fatal("expected datastore.ErrNoSuchEntity")
-	}
+// mockCacher will use the cacher configured and provide hooks for each call
+type mockCacher struct {
+	// override hooks for corresponding cacher function calls
+	newContextHook     func(c context.Context) (context.Context, error)
+	addMultiHook       func(c context.Context, items []*nds.Item) error
+	compareAndSwapHook func(c context.Context, items []*nds.Item) error
+	deleteMultiHook    func(c context.Context, keys []string) error
+	getMultiHook       func(c context.Context, keys []string) (map[string]*nds.Item, error)
+	setMultiHook       func(c context.Context, items []*nds.Item) error
+	// Fallback in case corresponding hook is not defined
+	cacher nds.Cacher
 }
 
-func TestInterfaces(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		Val int
+func (m *mockCacher) NewContext(c context.Context) (context.Context, error) {
+	if m.newContextHook != nil {
+		return m.newContextHook(c)
 	}
+	if m.cacher != nil {
+		return m.cacher.NewContext(c)
+	}
+	return nil, errNotDefined
+}
 
-	incompleteKey := datastore.NewIncompleteKey(c, "Entity", nil)
-	incompleteKeys := []*datastore.Key{incompleteKey}
-	entities := []interface{}{&testEntity{43}}
-	keys, err := nds.PutMulti(c, incompleteKeys, entities)
+func (m *mockCacher) AddMulti(c context.Context, items []*nds.Item) error {
+	if m.addMultiHook != nil {
+		return m.addMultiHook(c, items)
+	}
+	if m.cacher != nil {
+		return m.cacher.AddMulti(c, items)
+	}
+	return errNotDefined
+}
+
+func (m *mockCacher) CompareAndSwapMulti(c context.Context, items []*nds.Item) error {
+	if m.compareAndSwapHook != nil {
+		return m.compareAndSwapHook(c, items)
+	}
+	if m.cacher != nil {
+		return m.cacher.CompareAndSwapMulti(c, items)
+	}
+	return errNotDefined
+}
+
+func (m *mockCacher) DeleteMulti(c context.Context, keys []string) error {
+	if m.deleteMultiHook != nil {
+		return m.deleteMultiHook(c, keys)
+	}
+	if m.cacher != nil {
+		return m.cacher.DeleteMulti(c, keys)
+	}
+	return errNotDefined
+}
+
+func (m *mockCacher) GetMulti(c context.Context, keys []string) (map[string]*nds.Item, error) {
+	if m.getMultiHook != nil {
+		return m.getMultiHook(c, keys)
+	}
+	if m.cacher != nil {
+		return m.cacher.GetMulti(c, keys)
+	}
+	return nil, errNotDefined
+}
+
+func (m *mockCacher) SetMulti(c context.Context, items []*nds.Item) error {
+	if m.setMultiHook != nil {
+		return m.setMultiHook(c, items)
+	}
+	if m.cacher != nil {
+		return m.cacher.SetMulti(c, items)
+	}
+	return errNotDefined
+}
+
+func TestMain(m *testing.M) {
+	if appEnginePreHook != nil {
+		appEnginePreHook()
+	}
+	retCode := m.Run()
+	if appEnginePostHook != nil {
+		appEnginePostHook()
+	}
+	os.Exit(retCode)
+}
+
+func NewClient(c context.Context, cacher nds.Cacher) (*nds.Client, error) {
+	dsclient, err := datastore.NewClient(c, "")
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	if len(keys) != 1 {
-		t.Fatal("len(keys) != 1")
-	}
+	return nds.NewClient(c, &nds.Config{CacheBackend: cacher, DatastoreClient: dsclient}), nil
+}
 
-	if keys[0].Incomplete() {
-		t.Fatal("Key is incomplete")
-	}
-
-	entities = []interface{}{&testEntity{}}
-	if err := nds.GetMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	if entities[0].(*testEntity).Val != 43 {
-		t.Fatal("te.Val != 43")
-	}
-
-	// Get from cache.
-	entities = []interface{}{&testEntity{}}
-	if err := nds.GetMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
+func TestCachers(t *testing.T) {
+	for _, item := range cachers {
+		t.Run(fmt.Sprintf("cacher=%T", item.cacher), func(t *testing.T) {
+			t.Run("TestPutGetDelete", PutGetDeleteTest(item.ctx, item.cacher))
+			t.Run("TestInterfaces", InterfacesTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiNoSuchEntity", GetMultiNoSuchEntityTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiNoErrors", GetMultiNoErrorsTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiErrorMix", GetMultiErrorMixTest(item.ctx, item.cacher))
+			t.Run("TestMultiCache", MultiCacheTest(item.ctx, item.cacher))
+			t.Run("TestRunInTransaction", RunInTransactionTest(item.ctx, item.cacher))
+		})
 	}
 
-	if entities[0].(*testEntity).Val != 43 {
-		t.Fatal("te.Val != 43")
-	}
+}
 
-	// Change value.
-	entities = []interface{}{&testEntity{64}}
-	if _, err := nds.PutMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	// Get from nds with struct.
-	entities = []interface{}{&testEntity{}}
-	if err := nds.GetMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	if entities[0].(*testEntity).Val != 64 {
-		t.Fatal("te.Val != 64")
-	}
-
-	if err := nds.DeleteMulti(c, keys); err != nil {
-		t.Fatal(err)
-	}
-
-	entities = []interface{}{testEntity{}}
-	err = nds.GetMulti(c, keys, entities)
-	if me, ok := err.(appengine.MultiError); ok {
-
-		if len(me) != 1 {
-			t.Fatal("expected 1 appengine.MultiError")
+func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		type testEntity struct {
+			IntVal int
 		}
-		if me[0] != datastore.ErrNoSuchEntity {
+
+		// Check we set the cache, put datastore and delete cache.
+		seq := make(chan string, 3)
+		testCacher := &mockCacher{
+			cacher: cacher,
+			setMultiHook: func(c context.Context, items []*nds.Item) error {
+				seq <- "cache.SetMulti"
+				return cacher.SetMulti(c, items)
+			},
+			deleteMultiHook: func(c context.Context, keys []string) error {
+				seq <- "cache.DeleteMulti"
+				close(seq)
+				return cacher.DeleteMulti(c, keys)
+			},
+		}
+		nds.SetDatastorePutMultiHook(func() error {
+			seq <- "datastore.PutMulti"
+			return nil
+		})
+
+		nsdClient, err := NewClient(c, testCacher)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		incompleteKey := datastore.IncompleteKey("PutGetDeleteTest", nil)
+		key, err := nsdClient.Put(c, incompleteKey, &testEntity{43})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		nds.SetDatastorePutMultiHook(nil)
+		testCacher.setMultiHook = nil
+		testCacher.deleteMultiHook = nil
+
+		if s := <-seq; s != "cache.SetMulti" {
+			t.Fatal("cache.SetMulti not", s)
+		}
+		if s := <-seq; s != "datastore.PutMulti" {
+			t.Fatal("datastore.PutMulti not", s)
+		}
+		if s := <-seq; s != "cache.DeleteMulti" {
+			t.Fatal("cache.DeleteMulti not", s)
+		}
+		// Check chan is closed.
+		<-seq
+
+		if key.Incomplete() {
+			t.Fatal("Key is incomplete")
+		}
+
+		te := &testEntity{}
+		if err := nsdClient.Get(c, key, te); err != nil {
+			t.Fatal(err)
+		}
+
+		if te.IntVal != 43 {
+			t.Fatal("te.Val != 43", te.IntVal)
+		}
+
+		// Get from cache.
+		te = &testEntity{}
+		if err := nsdClient.Get(c, key, te); err != nil {
+			t.Fatal(err)
+		}
+
+		if te.IntVal != 43 {
+			t.Fatal("te.Val != 43", te.IntVal)
+		}
+
+		// Change value.
+		if _, err := nsdClient.Put(c, key, &testEntity{64}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Get from cache.
+		te = &testEntity{}
+		if err := nsdClient.Get(c, key, te); err != nil {
+			t.Fatal(err)
+		}
+
+		if te.IntVal != 64 {
+			t.Fatal("te.Val != 64", te.IntVal)
+		}
+
+		if err := nsdClient.Delete(c, key); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := nsdClient.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
 			t.Fatal("expected datastore.ErrNoSuchEntity")
 		}
-	} else {
-		t.Fatal("expected datastore.ErrNoSuchEntity", err)
 	}
 }
 
-func TestGetMultiNoSuchEntity(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		Val int
-	}
-
-	// Test no such entity.
-	for _, count := range []int{999, 1000, 1001} {
-
-		keys := []*datastore.Key{}
-		entities := []*testEntity{}
-		for i := 0; i < count; i++ {
-			keys = append(keys,
-				datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil))
-			entities = append(entities, &testEntity{})
+func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
+			t.Fatal(err)
 		}
 
-		err := nds.GetMulti(c, keys, entities)
-		if me, ok := err.(appengine.MultiError); ok {
-			if len(me) != count {
-				t.Fatal("multi error length incorrect")
+		type testEntity struct {
+			Val int
+		}
+
+		incompleteKey := datastore.IncompleteKey("InterfacesTest", nil)
+		incompleteKeys := []*datastore.Key{incompleteKey}
+		entities := []interface{}{&testEntity{43}}
+		keys, err := ndsClient.PutMulti(c, incompleteKeys, entities)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(keys) != 1 {
+			t.Fatal("len(keys) != 1")
+		}
+
+		if keys[0].Incomplete() {
+			t.Fatal("Key is incomplete")
+		}
+
+		entities = []interface{}{&testEntity{}}
+		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		if entities[0].(*testEntity).Val != 43 {
+			t.Fatal("te.Val != 43")
+		}
+
+		// Get from cache.
+		entities = []interface{}{&testEntity{}}
+		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		if entities[0].(*testEntity).Val != 43 {
+			t.Fatal("te.Val != 43")
+		}
+
+		// Change value.
+		entities = []interface{}{&testEntity{64}}
+		if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		// Get from nds with struct.
+		entities = []interface{}{&testEntity{}}
+		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		if entities[0].(*testEntity).Val != 64 {
+			t.Fatal("te.Val != 64")
+		}
+
+		if err := ndsClient.DeleteMulti(c, keys); err != nil {
+			t.Fatal(err)
+		}
+
+		entities = []interface{}{testEntity{}}
+		err = ndsClient.GetMulti(c, keys, entities)
+		if me, ok := err.(datastore.MultiError); ok {
+
+			if len(me) != 1 {
+				t.Fatal("expected 1 datastore.MultiError")
 			}
-			for _, e := range me {
-				if e != datastore.ErrNoSuchEntity {
-					t.Fatal("expecting datastore.ErrNoSuchEntity but got", e)
+			if me[0] != datastore.ErrNoSuchEntity {
+				t.Fatal("expected datastore.ErrNoSuchEntity")
+			}
+		} else {
+			t.Fatal("expected datastore.ErrNoSuchEntity", err)
+		}
+	}
+}
+
+func GetMultiNoSuchEntityTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type testEntity struct {
+			Val int
+		}
+
+		// Test no such entity.
+		for _, count := range []int{999, 1000, 1001} {
+
+			keys := []*datastore.Key{}
+			entities := []*testEntity{}
+			for i := 0; i < count; i++ {
+				keys = append(keys,
+					datastore.NameKey("GetMultiNoSuchEntityTest", strconv.Itoa(i), nil))
+				entities = append(entities, &testEntity{})
+			}
+
+			err := ndsClient.GetMulti(c, keys, entities)
+			if me, ok := err.(datastore.MultiError); ok {
+				if len(me) != count {
+					t.Fatal("multi error length incorrect")
+				}
+				for _, e := range me {
+					if e != datastore.ErrNoSuchEntity {
+						t.Fatal("expecting datastore.ErrNoSuchEntity but got", e)
+					}
 				}
 			}
 		}
 	}
 }
 
-func TestGetMultiNoErrors(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		Val int
-	}
-
-	for _, count := range []int{999, 1000, 1001} {
-
-		// Create entities.
-		keys := []*datastore.Key{}
-		entities := []*testEntity{}
-		for i := 0; i < count; i++ {
-			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
-			keys = append(keys, key)
-			entities = append(entities, &testEntity{i})
-		}
-
-		// Save entities.
-		if _, err := nds.PutMulti(c, keys, entities); err != nil {
+func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		respEntities := []testEntity{}
-		for range keys {
-			respEntities = append(respEntities, testEntity{})
+		type testEntity struct {
+			Val int
 		}
 
-		if err := nds.GetMulti(c, keys, respEntities); err != nil {
-			t.Fatal(err)
-		}
+		for _, count := range []int{999, 1000, 1001} {
 
-		// Check respEntities are in order.
-		for i, re := range respEntities {
-			if re.Val != entities[i].Val {
-				t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
-					entities[i].Val)
+			// Create entities.
+			keys := []*datastore.Key{}
+			entities := []*testEntity{}
+			for i := 0; i < count; i++ {
+				key := datastore.NameKey("GetMultiNoErrorsTest", strconv.Itoa(i), nil)
+				keys = append(keys, key)
+				entities = append(entities, &testEntity{i})
+			}
+
+			// Save entities.
+			if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+				t.Fatal(err)
+			}
+
+			respEntities := []testEntity{}
+			for range keys {
+				respEntities = append(respEntities, testEntity{})
+			}
+
+			if err := ndsClient.GetMulti(c, keys, respEntities); err != nil {
+				t.Fatal(err)
+			}
+
+			// Check respEntities are in order.
+			for i, re := range respEntities {
+				if re.Val != entities[i].Val {
+					t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+						entities[i].Val)
+				}
 			}
 		}
 	}
 }
 
-func TestGetMultiErrorMix(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
+func GetMultiErrorMixTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	type testEntity struct {
-		Val int
+		type testEntity struct {
+			Val int
+		}
+
+		for _, count := range []int{999, 1000, 1001} {
+
+			// Create entities.
+			keys := []*datastore.Key{}
+			entities := []testEntity{}
+			for i := 0; i < count; i++ {
+				key := datastore.NameKey("GetMultiErrorMixTest", strconv.Itoa(i), nil)
+				keys = append(keys, key)
+				entities = append(entities, testEntity{i})
+			}
+
+			// Save every other entity.
+			putKeys := []*datastore.Key{}
+			putEntities := []testEntity{}
+			for i, key := range keys {
+				if i%2 == 0 {
+					putKeys = append(putKeys, key)
+					putEntities = append(putEntities, entities[i])
+				}
+			}
+
+			if _, err := ndsClient.PutMulti(c, putKeys, putEntities); err != nil {
+				t.Fatal(err)
+			}
+
+			respEntities := make([]testEntity, len(keys))
+			err := ndsClient.GetMulti(c, keys, respEntities)
+			if err == nil {
+				t.Fatal("should be errors")
+			}
+
+			if me, ok := err.(datastore.MultiError); !ok {
+				t.Fatal("not datastore.MultiError")
+			} else if len(me) != len(keys) {
+				t.Fatal("incorrect length datastore.MultiError")
+			}
+
+			// Check respEntities are in order.
+			for i, re := range respEntities {
+				if i%2 == 0 {
+					if re.Val != entities[i].Val {
+						t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+							entities[i].Val)
+					}
+				} else if me, ok := err.(datastore.MultiError); ok {
+					if me[i] != datastore.ErrNoSuchEntity {
+						t.Fatalf("incorrect error %+v, index %d, of %d",
+							me, i, count)
+					}
+				} else {
+					t.Fatalf("incorrect error, index %d", i)
+				}
+			}
+		}
 	}
+}
 
-	for _, count := range []int{999, 1000, 1001} {
+func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type testEntity struct {
+			Val int
+		}
+		const entityCount = 88
 
 		// Create entities.
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
-		for i := 0; i < count; i++ {
-			key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
+		for i := 0; i < entityCount; i++ {
+			key := datastore.NameKey("MultiCacheTest", strconv.Itoa(i), nil)
 			keys = append(keys, key)
 			entities = append(entities, testEntity{i})
 		}
@@ -302,21 +504,22 @@ func TestGetMultiErrorMix(t *testing.T) {
 				putEntities = append(putEntities, entities[i])
 			}
 		}
-
-		if _, err := nds.PutMulti(c, putKeys, putEntities); err != nil {
+		if keys, err := ndsClient.PutMulti(c, putKeys, putEntities); err != nil {
 			t.Fatal(err)
+		} else if len(keys) != len(putKeys) {
+			t.Fatal("incorrect key len")
 		}
 
+		// Get from nds.
 		respEntities := make([]testEntity, len(keys))
-		err := nds.GetMulti(c, keys, respEntities)
+		err = ndsClient.GetMulti(c, keys, respEntities)
 		if err == nil {
 			t.Fatal("should be errors")
 		}
 
-		if me, ok := err.(appengine.MultiError); !ok {
-			t.Fatal("not appengine.MultiError")
-		} else if len(me) != len(keys) {
-			t.Fatal("incorrect length appengine.MultiError")
+		me, ok := err.(datastore.MultiError)
+		if !ok {
+			t.Fatalf("not an datastore.MultiError: %T, %s", err, err)
 		}
 
 		// Check respEntities are in order.
@@ -326,235 +529,167 @@ func TestGetMultiErrorMix(t *testing.T) {
 					t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
 						entities[i].Val)
 				}
-			} else if me, ok := err.(appengine.MultiError); ok {
-				if me[i] != datastore.ErrNoSuchEntity {
-					t.Fatalf("incorrect error %+v, index %d, of %d",
-						me, i, count)
+				if me[i] != nil {
+					t.Fatalf("should be nil error: %s", me[i])
 				}
 			} else {
-				t.Fatalf("incorrect error, index %d", i)
+				if re.Val != 0 {
+					t.Fatal("entity not zeroed")
+				}
+				if me[i] != datastore.ErrNoSuchEntity {
+					t.Fatalf("incorrect error %+v, index %d, of %d",
+						me, i, entityCount)
+				}
+			}
+		}
+
+		// Get from local cache.
+		respEntities = make([]testEntity, len(keys))
+		err = ndsClient.GetMulti(c, keys, respEntities)
+		if err == nil {
+			t.Fatal("should be errors")
+		}
+
+		me, ok = err.(datastore.MultiError)
+		if !ok {
+			t.Fatalf("not an datastore.MultiError: %s", err)
+		}
+
+		// Check respEntities are in order.
+		for i, re := range respEntities {
+			if i%2 == 0 {
+				if re.Val != entities[i].Val {
+					t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+						entities[i].Val)
+				}
+				if me[i] != nil {
+					t.Fatal("should be nil error")
+				}
+			} else {
+				if re.Val != 0 {
+					t.Fatal("entity not zeroed")
+				}
+				if me[i] != datastore.ErrNoSuchEntity {
+					t.Fatalf("incorrect error %+v, index %d, of %d",
+						me, i, entityCount)
+				}
+			}
+		}
+
+		// Get from cache.
+		respEntities = make([]testEntity, len(keys))
+		err = ndsClient.GetMulti(c, keys, respEntities)
+		if err == nil {
+			t.Fatal("should be errors")
+		}
+
+		me, ok = err.(datastore.MultiError)
+		if !ok {
+			t.Fatalf("not an datastore.MultiError: %T", me)
+		}
+
+		// Check respEntities are in order.
+		for i, re := range respEntities {
+			if i%2 == 0 {
+				if re.Val != entities[i].Val {
+					t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
+						entities[i].Val)
+				}
+				if me[i] != nil {
+					t.Fatal("should be nil error")
+				}
+			} else {
+				if re.Val != 0 {
+					t.Fatal("entity not zeroed")
+				}
+				if me[i] != datastore.ErrNoSuchEntity {
+					t.Fatalf("incorrect error %+v, index %d, of %d",
+						me, i, entityCount)
+				}
 			}
 		}
 	}
 }
 
-func TestMultiCache(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		Val int
-	}
-	const entityCount = 88
-
-	// Create entities.
-	keys := []*datastore.Key{}
-	entities := []testEntity{}
-	for i := 0; i < entityCount; i++ {
-		key := datastore.NewKey(c, "Test", strconv.Itoa(i), 0, nil)
-		keys = append(keys, key)
-		entities = append(entities, testEntity{i})
-	}
-
-	// Save every other entity.
-	putKeys := []*datastore.Key{}
-	putEntities := []testEntity{}
-	for i, key := range keys {
-		if i%2 == 0 {
-			putKeys = append(putKeys, key)
-			putEntities = append(putEntities, entities[i])
-		}
-	}
-	if keys, err := nds.PutMulti(c, putKeys, putEntities); err != nil {
-		t.Fatal(err)
-	} else if len(keys) != len(putKeys) {
-		t.Fatal("incorrect key len")
-	}
-
-	// Get from nds.
-	respEntities := make([]testEntity, len(keys))
-	err := nds.GetMulti(c, keys, respEntities)
-	if err == nil {
-		t.Fatal("should be errors")
-	}
-
-	me, ok := err.(appengine.MultiError)
-	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T, %s", err, err)
-	}
-
-	// Check respEntities are in order.
-	for i, re := range respEntities {
-		if i%2 == 0 {
-			if re.Val != entities[i].Val {
-				t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
-					entities[i].Val)
-			}
-			if me[i] != nil {
-				t.Fatalf("should be nil error: %s", me[i])
-			}
-		} else {
-			if re.Val != 0 {
-				t.Fatal("entity not zeroed")
-			}
-			if me[i] != datastore.ErrNoSuchEntity {
-				t.Fatalf("incorrect error %+v, index %d, of %d",
-					me, i, entityCount)
-			}
-		}
-	}
-
-	// Get from local cache.
-	respEntities = make([]testEntity, len(keys))
-	err = nds.GetMulti(c, keys, respEntities)
-	if err == nil {
-		t.Fatal("should be errors")
-	}
-
-	me, ok = err.(appengine.MultiError)
-	if !ok {
-		t.Fatalf("not an appengine.MultiError: %s", err)
-	}
-
-	// Check respEntities are in order.
-	for i, re := range respEntities {
-		if i%2 == 0 {
-			if re.Val != entities[i].Val {
-				t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
-					entities[i].Val)
-			}
-			if me[i] != nil {
-				t.Fatal("should be nil error")
-			}
-		} else {
-			if re.Val != 0 {
-				t.Fatal("entity not zeroed")
-			}
-			if me[i] != datastore.ErrNoSuchEntity {
-				t.Fatalf("incorrect error %+v, index %d, of %d",
-					me, i, entityCount)
-			}
-		}
-	}
-
-	// Get from memcache.
-	respEntities = make([]testEntity, len(keys))
-	err = nds.GetMulti(c, keys, respEntities)
-	if err == nil {
-		t.Fatal("should be errors")
-	}
-
-	me, ok = err.(appengine.MultiError)
-	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T", me)
-	}
-
-	// Check respEntities are in order.
-	for i, re := range respEntities {
-		if i%2 == 0 {
-			if re.Val != entities[i].Val {
-				t.Fatalf("respEntities in wrong order, %d vs %d", re.Val,
-					entities[i].Val)
-			}
-			if me[i] != nil {
-				t.Fatal("should be nil error")
-			}
-		} else {
-			if re.Val != 0 {
-				t.Fatal("entity not zeroed")
-			}
-			if me[i] != datastore.ErrNoSuchEntity {
-				t.Fatalf("incorrect error %+v, index %d, of %d",
-					me, i, entityCount)
-			}
-		}
-	}
-}
-
-func TestRunInTransaction(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		Val int
-	}
-
-	key := datastore.NewKey(c, "Entity", "", 3, nil)
-	keys := []*datastore.Key{key}
-	entity := testEntity{42}
-	entities := []testEntity{entity}
-
-	if _, err := nds.PutMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-
-	err := nds.RunInTransaction(c, func(tc context.Context) error {
-		entities := make([]testEntity, 1, 1)
-		if err := nds.GetMulti(tc, keys, entities); err != nil {
-			t.Fatal(err)
-		}
-		entity := entities[0]
-
-		if entity.Val != 42 {
-			t.Fatalf("entity.Val != 42: %d", entity.Val)
-		}
-
-		entities[0].Val = 43
-
-		putKeys, err := nds.PutMulti(tc, keys, entities)
+func RunInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
 		if err != nil {
 			t.Fatal(err)
-		} else if len(putKeys) != 1 {
-			t.Fatal("putKeys should be len 1")
-		} else if !putKeys[0].Equal(key) {
+		}
+
+		type testEntity struct {
+			Val int
+		}
+
+		key := datastore.IDKey("RunInTransactionTest", 3, nil)
+		keys := []*datastore.Key{key}
+		entity := testEntity{42}
+		entities := []testEntity{entity}
+
+		if _, err = ndsClient.PutMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+		var putKey *datastore.PendingKey
+		commit, err := ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+			entities := make([]testEntity, 1, 1)
+			if err := tx.GetMulti(keys, entities); err != nil {
+				t.Fatal(err)
+			}
+			entity := entities[0]
+
+			if entity.Val != 42 {
+				t.Fatalf("entity.Val != 42: %d", entity.Val)
+			}
+
+			entities[0].Val = 43
+
+			putKeys, err := tx.PutMulti(keys, entities)
+			if err != nil {
+				t.Fatal(err)
+			} else if len(putKeys) != 1 {
+				t.Fatal("putKeys should be len 1")
+			}
+			putKey = putKeys[0]
+			return nil
+
+		})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !commit.Key(putKey).Equal(key) {
 			t.Fatal("keys not equal")
 		}
-		return nil
 
-	}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	entities = make([]testEntity, 1, 1)
-	if err := nds.GetMulti(c, keys, entities); err != nil {
-		t.Fatal(err)
-	}
-	entity = entities[0]
-	if entity.Val != 43 {
-		t.Fatalf("entity.Val != 43: %d", entity.Val)
+		entities = make([]testEntity, 1, 1)
+		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+		entity = entities[0]
+		if entity.Val != 43 {
+			t.Fatalf("entity.Val != 43: %d", entity.Val)
+		}
 	}
 }
 
 func TestMarshalUnmarshalPropertyList(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
 	timeVal := time.Now()
 	timeProp := datastore.Property{Name: "Time",
-		Value: timeVal, NoIndex: false, Multiple: false}
+		Value: timeVal, NoIndex: false}
 
-	byteStringVal := datastore.ByteString{0x23}
-	byteStringProp := datastore.Property{Name: "ByteString",
-		Value: byteStringVal, NoIndex: false, Multiple: false}
-
-	keyVal := datastore.NewKey(c, "Entity", "stringID", 0, nil)
+	keyVal := datastore.NameKey("Entity", "stringID", nil)
 	keyProp := datastore.Property{Name: "Key",
-		Value: keyVal, NoIndex: false, Multiple: false}
+		Value: keyVal, NoIndex: false}
 
-	blobKeyVal := appengine.BlobKey("blobkey")
-	blobKeyProp := datastore.Property{Name: "BlobKey",
-		Value: blobKeyVal, NoIndex: false, Multiple: false}
-
-	geoPointVal := appengine.GeoPoint{1, 2}
+	geoPointVal := datastore.GeoPoint{Lat: 1, Lng: 2}
 	geoPointProp := datastore.Property{Name: "GeoPoint",
-		Value: geoPointVal, NoIndex: false, Multiple: false}
+		Value: geoPointVal, NoIndex: false}
 
 	pl := datastore.PropertyList{
 		timeProp,
-		byteStringProp,
 		keyProp,
-		blobKeyProp,
 		geoPointProp,
 	}
 	data, err := nds.MarshalPropertyList(pl)
@@ -563,18 +698,16 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 	}
 
 	testEntity := &struct {
-		Time       time.Time
-		ByteString datastore.ByteString
-		Key        *datastore.Key
-		BlobKey    appengine.BlobKey
-		GeoPoint   appengine.GeoPoint
+		Time     time.Time
+		Key      *datastore.Key
+		GeoPoint datastore.GeoPoint
 	}{}
 
 	pl = datastore.PropertyList{}
 	if err := nds.UnmarshalPropertyList(data, &pl); err != nil {
 		t.Fatal(err)
 	}
-	if err := nds.SetValue(reflect.ValueOf(testEntity), pl); err != nil {
+	if err := nds.SetValue(reflect.ValueOf(testEntity), pl, keyVal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -582,16 +715,8 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 		t.Fatal("timeVal not equal")
 	}
 
-	if string(testEntity.ByteString) != string(byteStringVal) {
-		t.Fatal("byteStringVal not equal")
-	}
-
 	if !testEntity.Key.Equal(keyVal) {
 		t.Fatal("keyVal not equal")
-	}
-
-	if testEntity.BlobKey != blobKeyVal {
-		t.Fatal("blobKeyVal not equal")
 	}
 
 	if !reflect.DeepEqual(testEntity.GeoPoint, geoPointVal) {
@@ -606,7 +731,7 @@ func TestMartialPropertyListError(t *testing.T) {
 	}
 
 	pl := datastore.PropertyList{
-		datastore.Property{"Prop", &testEntity{3}, false, false},
+		datastore.Property{Name: "Prop", Value: &testEntity{3}, NoIndex: false},
 	}
 	if _, err := nds.MarshalPropertyList(pl); err == nil {
 		t.Fatal("expected error")
@@ -621,51 +746,14 @@ func randHexString(length int) string {
 	return hex.EncodeToString(bytes)
 }
 
-func TestCreateMemcacheKey(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
+func TestCreateCacheKey(t *testing.T) {
+	// Check keys are hashed over nds.CacheMaxKeySize.
+	maxKeySize := nds.CacheMaxKeySize
+	key := datastore.NameKey("TestCreateCacheKey",
+		randHexString(maxKeySize+10), nil)
 
-	// Check keys are hashed over nds.MemcacheMaxKeySize.
-	maxKeySize := nds.MemcacheMaxKeySize
-	key := datastore.NewKey(c, "TestEntity",
-		randHexString(maxKeySize+10), 0, nil)
-
-	memcacheKey := nds.CreateMemcacheKey(key)
-	if len(memcacheKey) > maxKeySize {
-		t.Fatal("incorrect memcache key size")
+	cacheKey := nds.CreateCacheKey(key)
+	if len(cacheKey) > maxKeySize {
+		t.Fatal("incorrect cache key size")
 	}
-}
-
-func TestMemcacheNamespace(t *testing.T) {
-
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		IntVal int
-	}
-
-	// Illegal namespace chars.
-	nds.SetMemcacheNamespace("£££")
-
-	key := datastore.NewKey(c, "Entity", "", 1, nil)
-	if err := nds.Get(c, key, &testEntity{}); err == nil {
-		t.Fatal("expected namespace error")
-	}
-
-	if _, err := nds.Put(c, key, &testEntity{}); err == nil {
-		t.Fatal("expected namespace error")
-	}
-
-	if err := nds.Delete(c, key); err == nil {
-		t.Fatal("expected namespace error")
-	}
-
-	if err := nds.RunInTransaction(c, func(tc context.Context) error {
-		return nil
-	}, nil); err == nil {
-		t.Fatal("expected namespace error")
-	}
-
-	nds.SetMemcacheNamespace("")
 }
