@@ -1,23 +1,22 @@
 package nds
 
 import (
+	"context"
 	"sync"
 
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
 )
 
-// deleteMultiLimit is the App Engine datastore limit for the maximum number
+// deleteMultiLimit is the Google Cloud Datastore limit for the maximum number
 // of entities that can be deleted by datastore.DeleteMulti at once.
+// https://cloud.google.com/datastore/docs/concepts/limits
 const deleteMultiLimit = 500
 
 // DeleteMulti works just like datastore.DeleteMulti except it maintains
 // cache consistency with other NDS methods. It also removes the API limit of
 // 500 entities per request by calling the datastore as many times as required
 // to put all the keys. It does this efficiently and concurrently.
-func DeleteMulti(c context.Context, keys []*datastore.Key) error {
+func (c *Client) DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
 
 	callCount := (len(keys)-1)/deleteMultiLimit + 1
 	errs := make([]error, callCount)
@@ -32,7 +31,7 @@ func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 		}
 
 		go func(i int, keys []*datastore.Key) {
-			errs[i] = deleteMulti(c, keys)
+			errs[i] = c.deleteMulti(ctx, keys)
 			wg.Done()
 		}(i, keys[lo:hi])
 	}
@@ -46,48 +45,30 @@ func DeleteMulti(c context.Context, keys []*datastore.Key) error {
 }
 
 // Delete deletes the entity for the given key.
-func Delete(c context.Context, key *datastore.Key) error {
-	err := deleteMulti(c, []*datastore.Key{key})
-	if me, ok := err.(appengine.MultiError); ok {
+func (c *Client) Delete(ctx context.Context, key *datastore.Key) error {
+	err := c.deleteMulti(ctx, []*datastore.Key{key})
+	if me, ok := err.(datastore.MultiError); ok {
 		return me[0]
 	}
 	return err
 }
 
-func deleteMulti(c context.Context, keys []*datastore.Key) error {
+// deleteMulti will batch delete keys by first locking the corresponding items in the
+// cache then deleting them from datastore.
+func (c *Client) deleteMulti(ctx context.Context, keys []*datastore.Key) error {
 
-	lockMemcacheItems := []*memcache.Item{}
-	for _, key := range keys {
-		// Worst case scenario is that we lock the entity for memcacheLockTime.
-		// datastore.Delete will raise the appropriate error.
-		if key == nil || key.Incomplete() {
-			continue
-		}
+	_, lockCacheItems := getCacheLocks(keys)
 
-		item := &memcache.Item{
-			Key:        createMemcacheKey(key),
-			Flags:      lockItem,
-			Value:      itemLock(),
-			Expiration: memcacheLockTime,
-		}
-		lockMemcacheItems = append(lockMemcacheItems, item)
-	}
-
-	memcacheCtx, err := memcacheContext(c)
+	cacheCtx, err := c.cacher.NewContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Make sure we can lock memcache with no errors before deleting.
-	if tx, ok := transactionFromContext(c); ok {
-		tx.Lock()
-		tx.lockMemcacheItems = append(tx.lockMemcacheItems,
-			lockMemcacheItems...)
-		tx.Unlock()
-	} else if err := memcacheSetMulti(memcacheCtx,
-		lockMemcacheItems); err != nil {
+	// Make sure we can lock the cache with no errors before deleting.
+	if err := c.cacher.SetMulti(cacheCtx,
+		lockCacheItems); err != nil {
 		return err
 	}
 
-	return datastoreDeleteMulti(c, keys)
+	return c.ds.DeleteMulti(ctx, keys)
 }
