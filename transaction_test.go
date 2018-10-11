@@ -1,101 +1,120 @@
 package nds_test
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 
+	"cloud.google.com/go/datastore"
+
 	"github.com/qedus/nds"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
 )
 
-func TestTransactionOptions(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
-
-	type testEntity struct {
-		Val int
+func TestTransactionSuite(t *testing.T) {
+	for _, item := range cachers {
+		t.Run(fmt.Sprintf("cacher=%T", item.cacher), func(t *testing.T) {
+			t.Run("TestTransactionOptions", TransactionOptionsTest(item.ctx, item.cacher))
+			t.Run("TestClearNamespacedLocks", ClearNamespacedLocksTest(item.ctx, item.cacher))
+		})
 	}
+}
 
-	opts := &datastore.TransactionOptions{XG: true}
-	err := nds.RunInTransaction(c, func(tc context.Context) error {
-		for i := 0; i < 4; i++ {
-			key := datastore.NewIncompleteKey(tc, "Entity", nil)
-			if _, err := nds.Put(tc, key, &testEntity{i}); err != nil {
-				return err
-			}
+func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
+			t.Fatal(err)
 		}
-		return nil
-	}, opts)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	opts = &datastore.TransactionOptions{XG: false}
-	err = nds.RunInTransaction(c, func(tc context.Context) error {
-		for i := 0; i < 4; i++ {
-			key := datastore.NewIncompleteKey(tc, "Entity", nil)
-			if _, err := nds.Put(tc, key, &testEntity{i}); err != nil {
-				return err
-			}
+		type testEntity struct {
+			Val int
 		}
-		return nil
-	}, opts)
 
-	if err == nil {
-		t.Fatal("expected cross-group error")
+		// All Transaction are cross group enabled up to 25 groups
+		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+			for i := 0; i < 25; i++ {
+				key := datastore.IncompleteKey("Entity", nil)
+				if _, err := tx.Put(key, &testEntity{i}); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// All Transaction are cross group enabled up to 25 groups
+		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+			for i := 0; i < 26; i++ {
+				key := datastore.IncompleteKey("Entity", nil)
+				if _, err := tx.Put(key, &testEntity{i}); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		if err == nil {
+			t.Fatal("expected cross-group error")
+		}
 	}
 
 }
 
-// TestClearNamespacedLocks tests to make sure that locks are cleared when
+// ClearNamespacedLocksTest tests to make sure that locks are cleared when
 // RunInTransaction is using a namespace.
-func TestClearNamespacedLocks(t *testing.T) {
-	c, closeFunc := NewContext(t)
-	defer closeFunc()
+func ClearNamespacedLocksTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	c, err := appengine.Namespace(c, "testnamespace")
-	if err != nil {
-		t.Fatal(err)
-	}
+		ns := "testnamespace"
 
-	type testEntity struct {
-		Val int
-	}
+		type testEntity struct {
+			Val int
+		}
 
-	key := datastore.NewKey(c, "TestEntity", "", 1, nil)
+		key := datastore.IDKey("TestEntity", 1, nil)
+		key.Namespace = ns
 
-	// Prime cache.
-	if err := nds.Get(c, key, &testEntity{}); err == nil {
-		t.Fatal("expected no such entity")
-	} else if err != datastore.ErrNoSuchEntity {
-		t.Fatal(err)
-	}
-
-	if err := nds.RunInTransaction(c, func(tc context.Context) error {
-
-		if err := nds.Get(tc, key, &testEntity{}); err == nil {
-			return errors.New("expected no such entity")
+		// Prime cache.
+		if err := ndsClient.Get(c, key, &testEntity{}); err == nil {
+			t.Fatal("expected no such entity")
 		} else if err != datastore.ErrNoSuchEntity {
-			return err
+			t.Fatal(err)
 		}
 
-		if _, err := nds.Put(tc, key, &testEntity{3}); err != nil {
-			return err
+		if _, err := ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+
+			if err := tx.Get(key, &testEntity{}); err == nil {
+				return errors.New("expected no such entity")
+			} else if err != datastore.ErrNoSuchEntity {
+				return err
+			}
+
+			if _, err := tx.Put(key, &testEntity{3}); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
 		}
-		return nil
-	}, nil); err != nil {
-		t.Fatal(err)
-	}
 
-	entity := &testEntity{}
-	if err := nds.Get(c, key, entity); err != nil {
-		t.Fatal(err)
-	}
+		entity := &testEntity{}
+		if err := ndsClient.Get(c, key, entity); err != nil {
+			t.Fatal(err)
+		}
 
-	if entity.Val != 3 {
-		t.Fatal("incorrect val")
+		if entity.Val != 3 {
+			t.Fatal("incorrect val")
+		}
+
+		// Cleanup
+		ndsClient.Delete(c, key)
 	}
 }
