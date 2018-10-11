@@ -1,8 +1,8 @@
 /*
-Package nds is a Go datastore API for Google App Engine that caches datastore
-calls in memcache in a strongly consistent manner. This often has the effect
-of making your app faster as memcache access is often 10x faster than datastore
-access. It can also make your app cheaper to run as memcache calls are free.
+Package nds is a Go datastore API for Google Cloud Datastore that caches datastore
+calls in a cache in a strongly consistent manner. This often has the effect
+of making your app faster as cache access is often 10x faster than datastore
+access. It can also make your app cheaper to run as cache calls are typically cheaper.
 
 This package goes to great lengths to ensure that stale datastore values are
 never returned to clients, i.e. the caching layer is strongly consistent.
@@ -15,17 +15,19 @@ employed by this package.
 
 Use
 
-Package nds is used exactly the same way as appeninge/datastore. Ensure that
-you change all your datastore Get, Put, Delete and RunInTransaction function
-calls to use nds when converting your own code.
+Package nds' Client is used exactly the same way as the cloud.google.com/go/datastore.Client for
+implemented calls. Ensure that you change all your datastore client Get, Put, Delete and
+RunInTransaction function calls to use the nds client and Transaction type when converting your
+own code. The one caveat with transactions is when running queries, there is a helper function for
+adding the transaction to a datastore.Query.
 
-If you mix appengine/datastore and nds API calls then you are liable to get
-stale cache.
+If you mix datastore and nds API calls then you are liable to get stale cache. Currently, Mutations
+are not supported (but are incoming!)
 
-Converting Legacy Code
+Implement your own cache
 
-To convert legacy code you will need to find and replace all invocations of
-datastore.Get, datastore.Put, datastore.Delete, datastore.RunInTransaction with
-nds.Get, nds.Put, nds.Delete and nds.RunInTransaction respectively.
+You can implement your own nds.Cacher and use it in place of the cache backends provided by this package.
+The cache backends offered by Google such as AppEngine's Memcache and Cloud Memorystore (redis) are available
+via this package and can be used as references when adding your own.
 */
 package nds

@@ -94,7 +94,7 @@ func (t *Transaction) Rollback() (err error) {
 }
 
 // Query is a helper function to use underlying *datastore.Transaction for queries in nds Transactions
-func (t *Transaction) RunQuery(q *datastore.Query) *datastore.Query {
+func (t *Transaction) Query(q *datastore.Query) *datastore.Query {
 	return q.Transaction(t.tx)
 }
 
