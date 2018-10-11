@@ -9,52 +9,38 @@ import (
 	"reflect"
 	"time"
 
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/memcache"
+	"cloud.google.com/go/datastore"
 )
 
 const (
-	// memcachePrefix is the namespace memcache uses to store entities.
-	memcachePrefix = "NDS1:"
+	// cachePrefix is the namespace the cache uses to store entities.
+	cachePrefix = "NDS1:"
 
-	// memcacheLockTime is the maximum length of time a memcache lock will be
+	// cacheLockTime is the maximum length of time a cache lock will be
 	// held for. 32 seconds is chosen as 30 seconds is the maximum amount of
 	// time an underlying datastore call will retry even if the API reports a
 	// success to the user.
-	memcacheLockTime = 32 * time.Second
+	// TODO: Is this still accurate?
+	cacheLockTime = 32 * time.Second
 
-	// memcacheMaxKeySize is the maximum size a memcache item key can be. Keys
+	// cacheMaxKeySize is the maximum size an item key will be. Keys
 	// greater than this size are automatically hashed to a smaller size.
-	memcacheMaxKeySize = 250
+	cacheMaxKeySize = 250
 )
 
 var (
 	typeOfPropertyLoadSaver = reflect.TypeOf(
 		(*datastore.PropertyLoadSaver)(nil)).Elem()
 	typeOfPropertyList = reflect.TypeOf(datastore.PropertyList(nil))
+	typeOfKeyLoader    = reflect.TypeOf(
+		(*datastore.KeyLoader)(nil)).Elem()
 )
 
 // The variables in this block are here so that we can test all error code
 // paths by substituting them with error producing ones.
 var (
-	datastoreDeleteMulti = datastore.DeleteMulti
-	datastoreGetMulti    = datastore.GetMulti
-	datastorePutMulti    = datastore.PutMulti
-
-	memcacheAddMulti            = memcache.AddMulti
-	memcacheCompareAndSwapMulti = memcache.CompareAndSwapMulti
-	memcacheDeleteMulti         = memcache.DeleteMulti
-	memcacheGetMulti            = memcache.GetMulti
-	memcacheSetMulti            = memcache.SetMulti
-
 	marshal   = marshalPropertyList
 	unmarshal = unmarshalPropertyList
-
-	// memcacheNamespace is the namespace where all memcached entities are
-	// stored.
-	memcacheNamespace = ""
 )
 
 const (
@@ -65,10 +51,8 @@ const (
 
 func init() {
 	gob.Register(time.Time{})
-	gob.Register(datastore.ByteString{})
 	gob.Register(&datastore.Key{})
-	gob.Register(appengine.BlobKey(""))
-	gob.Register(appengine.GeoPoint{})
+	gob.Register(datastore.GeoPoint{})
 }
 
 type valueType int
@@ -79,9 +63,14 @@ const (
 	valueTypeStruct
 	valueTypeStructPtr
 	valueTypeInterface
+	valueTypeKeyLoader
 )
 
 func checkValueType(valType reflect.Type) valueType {
+
+	if reflect.PtrTo(valType).Implements(typeOfKeyLoader) {
+		return valueTypeKeyLoader
+	}
 
 	if reflect.PtrTo(valType).Implements(typeOfPropertyLoadSaver) {
 		return valueTypePropertyLoadSaver
@@ -110,7 +99,7 @@ func checkKeysValues(keys []*datastore.Key, values reflect.Value) error {
 		return errors.New("nds: keys and values slices have different length")
 	}
 
-	isNilErr, nilErr := false, make(appengine.MultiError, len(keys))
+	isNilErr, nilErr := false, make(datastore.MultiError, len(keys))
 	for i, key := range keys {
 		if key == nil {
 			isNilErr = true
@@ -131,17 +120,13 @@ func checkKeysValues(keys []*datastore.Key, values reflect.Value) error {
 	return nil
 }
 
-func createMemcacheKey(key *datastore.Key) string {
-	memcacheKey := memcachePrefix + key.Encode()
-	if len(memcacheKey) > memcacheMaxKeySize {
-		hash := sha1.Sum([]byte(memcacheKey))
-		memcacheKey = hex.EncodeToString(hash[:])
+func createCacheKey(key *datastore.Key) string {
+	cacheKey := cachePrefix + key.Encode()
+	if len(cacheKey) > cacheMaxKeySize {
+		hash := sha1.Sum([]byte(cacheKey))
+		cacheKey = hex.EncodeToString(hash[:])
 	}
-	return memcacheKey
-}
-
-func memcacheContext(c context.Context) (context.Context, error) {
-	return appengine.Namespace(c, memcacheNamespace)
+	return cacheKey
 }
 
 func marshalPropertyList(pl datastore.PropertyList) ([]byte, error) {
@@ -156,11 +141,11 @@ func unmarshalPropertyList(data []byte, pl *datastore.PropertyList) error {
 	return gob.NewDecoder(bytes.NewBuffer(data)).Decode(pl)
 }
 
-func setValue(val reflect.Value, pl datastore.PropertyList) error {
+func setValue(val reflect.Value, pl datastore.PropertyList, key *datastore.Key) error {
 
 	valType := checkValueType(val.Type())
 
-	if valType == valueTypePropertyLoadSaver || valType == valueTypeStruct {
+	if valType == valueTypePropertyLoadSaver || valType == valueTypeStruct || valType == valueTypeKeyLoader {
 		val = val.Addr()
 	}
 
@@ -170,6 +155,10 @@ func setValue(val reflect.Value, pl datastore.PropertyList) error {
 
 	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
 		return pls.Load(pl)
+	}
+
+	if pls, ok := val.Interface().(datastore.KeyLoader); ok {
+		return pls.LoadKey(key)
 	}
 
 	return datastore.LoadStruct(val.Interface(), pl)
@@ -185,14 +174,14 @@ func isErrorsNil(errs []error) bool {
 }
 
 func groupErrors(errs []error, total, limit int) error {
-	groupedErrs := make(appengine.MultiError, total)
+	groupedErrs := make(datastore.MultiError, total)
 	for i, err := range errs {
 		lo := i * limit
 		hi := (i + 1) * limit
 		if hi > total {
 			hi = total
 		}
-		if me, ok := err.(appengine.MultiError); ok {
+		if me, ok := err.(datastore.MultiError); ok {
 			copy(groupedErrs[lo:hi], me)
 		} else if err != nil {
 			for j := lo; j < hi; j++ {
@@ -201,4 +190,24 @@ func groupErrors(errs []error, total, limit int) error {
 		}
 	}
 	return groupedErrs
+}
+
+func getCacheLocks(keys []*datastore.Key) ([]string, []*Item) {
+	lockCacheKeys := make([]string, 0, len(keys))
+	lockCacheItems := make([]*Item, 0, len(keys))
+	for _, key := range keys {
+		// Worst case scenario is that we lock the entity for cacheLockTime.
+		// datastore.Delete will raise the appropriate error.
+		if key != nil && !key.Incomplete() {
+			item := &Item{
+				Key:        createCacheKey(key),
+				Flags:      lockItem,
+				Value:      itemLock(),
+				Expiration: cacheLockTime,
+			}
+			lockCacheItems = append(lockCacheItems, item)
+			lockCacheKeys = append(lockCacheKeys, item.Key)
+		}
+	}
+	return lockCacheKeys, lockCacheItems
 }
