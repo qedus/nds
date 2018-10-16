@@ -3,7 +3,7 @@ sudo: false
 go:
   - 1.10.x
 env:
-  - CLOUDSDK_CORE_PROJECT="NDSTEST" REDIS_ADDR="localhost:6379"
+  - REDIS_ADDR="localhost:6379"
 services:
   - redis-server
 before_install:
@@ -17,12 +17,13 @@ install:
   - "$HOME/google-cloud-sdk/bin/gcloud components install cloud-datastore-emulator --quiet"
   - goapp get -v -d -t ./...
 before_script:
+  - "$HOME/google-cloud-sdk/bin/gcloud config set project nds-test"
   - "$HOME/google-cloud-sdk/bin/gcloud beta emulators datastore start --quiet &"
   - sleep 15
   - "$($HOME/google-cloud-sdk/bin/gcloud beta emulators datastore env-init)"
 script:
-  - go test -v -covermode=count -coverprofile=profile.cov -coverpkg=$(shell go list ./... | grep -v '/vendor/' | paste -sd, -) ./...
-  - goapp test -v -covermode=count -coverprofile=aeprofile.cov -coverpkg=$(shell go list ./... | grep -v '/vendor/' | paste -sd, -) ./
+  - go test -covermode=count -coverprofile=profile.cov -coverpkg=$(go list ./... | grep -v '/vendor/' | paste -sd, -) ./...
+  - goapp test -covermode=count -coverprofile=aeprofile.cov -coverpkg=$(go list ./... | grep -v '/vendor/' | paste -sd, -) ./
 after_success:
   - go get -v github.com/mattn/goveralls
   - export PATH=$PATH:$HOME/gopath/bin
