@@ -2,20 +2,20 @@ language: go
 sudo: false
 go:
   - 1.10.x
+  - 1.11.x
 env:
-  - REDIS_ADDR="localhost:6379"
+  - REDIS_ADDR="localhost:6379" APPENGINE_DEV_APPSERVER="$HOME/google-cloud-sdk/bin/dev_appserver.py"
 services:
   - redis-server
 before_install:
-  - wget -O go_appengine_sdk_linux_amd64.zip https://storage.googleapis.com/appengine-sdks/featured/go_appengine_sdk_linux_amd64-1.9.68.zip
-  - unzip -q -d $HOME go_appengine_sdk_linux_amd64.zip
-  - export PATH=$PATH:$HOME/go_appengine
   - curl https://sdk.cloud.google.com > install.sh && chmod +x install.sh
 install:
   - "./install.sh --disable-prompts"
   - "$HOME/google-cloud-sdk/bin/gcloud components install beta --quiet"
   - "$HOME/google-cloud-sdk/bin/gcloud components install cloud-datastore-emulator --quiet"
-  - goapp get -v -d -t ./...
+  - "$HOME/google-cloud-sdk/bin/gcloud components install app-engine-python --quiet"
+  - "$HOME/google-cloud-sdk/bin/gcloud components install app-engine-go --quiet"
+  - go get -v -d -t ./...
 before_script:
   - "$HOME/google-cloud-sdk/bin/gcloud config set project nds-test"
   - "$HOME/google-cloud-sdk/bin/gcloud beta emulators datastore start --quiet &"
@@ -23,9 +23,7 @@ before_script:
   - "$($HOME/google-cloud-sdk/bin/gcloud beta emulators datastore env-init)"
 script:
   - go test -covermode=count -coverprofile=profile.cov -coverpkg=$(go list ./... | grep -v '/vendor/' | paste -sd, -) ./...
-  - goapp test -covermode=count -coverprofile=aeprofile.cov -coverpkg=$(go list ./... | grep -v '/vendor/' | paste -sd, -) ./
 after_success:
   - go get -v github.com/mattn/goveralls
   - export PATH=$PATH:$HOME/gopath/bin
-  - cat aeprofile.cov | grep .go >> profile.cov
   - goveralls -coverprofile=profile.cov -service=travis-ci

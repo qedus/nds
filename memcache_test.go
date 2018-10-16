@@ -1,5 +1,3 @@
-// +build appengine
-
 package nds_test
 
 import (
