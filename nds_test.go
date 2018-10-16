@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -14,9 +15,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/datastore"
+	"github.com/gomodule/redigo/redis"
 
 	"github.com/qedus/nds"
 	"github.com/qedus/nds/cachers/memory"
+	credis "github.com/qedus/nds/cachers/redis"
 )
 
 var (
@@ -107,10 +110,36 @@ func (m *mockCacher) SetMulti(c context.Context, items []*nds.Item) error {
 	return errNotDefined
 }
 
+func initRedis() {
+	if testing.Short() {
+		return
+	}
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		panic("expecting REDIS_ADDR")
+	}
+
+	redisPool := &redis.Pool{
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", redisAddr, redis.DialReadTimeout(time.Second))
+		},
+	}
+
+	cacher, err := credis.NewCacher(context.Background(), redisPool)
+	if err != nil {
+		panic(err)
+	}
+	cachersGuard.Lock()
+	defer cachersGuard.Unlock()
+	cachers = append(cachers, cacherTestItem{ctx: context.Background(), cacher: cacher})
+}
+
 func TestMain(m *testing.M) {
+	flag.Parse()
 	if appEnginePreHook != nil {
 		appEnginePreHook()
 	}
+	initRedis()
 	retCode := m.Run()
 	if appEnginePostHook != nil {
 		appEnginePostHook()
