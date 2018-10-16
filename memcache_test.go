@@ -16,6 +16,9 @@ import (
 
 func init() {
 	appEnginePreHook = func() {
+		if testing.Short() {
+			return
+		}
 		c, closeFunc, err := aetest.NewContext()
 		if err != nil {
 			panic(err)

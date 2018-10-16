@@ -16,8 +16,27 @@ import (
 func TestGetSuite(t *testing.T) {
 	for _, item := range cachers {
 		t.Run(fmt.Sprintf("cacher=%T", item.cacher), func(t *testing.T) {
-			t.Run("GetMultiStructTest", GetMultiStructTest(item.ctx, item.cacher))
-			t.Run("GetMultiStructPtrTest", GetMultiStructPtrTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiStruct", GetMultiStructTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiStructPtr", GetMultiStructPtrTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiStructPtrNil", GetMultiStructPtrNilTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiInterface", GetMultiInterfaceTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiPropertyLoadSaver", GetMultiPropertyLoadSaverTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiNoKeys", GetMultiNoKeysTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiInterfaceError", GetMultiInterfaceErrorTest(item.ctx, item.cacher))
+			t.Run("TestGetArgs", GetArgsTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiArgs", GetMultiArgsTest(item.ctx, item.cacher))
+			t.Run("TestGetSliceProperty", GetSlicePropertyTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiNoPropertyList", GetMultiNoPropertyListTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiNonStruct", GetMultiNonStructTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiLockReturnEntitySetValueFail", GetMultiLockReturnEntitySetValueFailTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiLockReturnEntity", GetMultiLockReturnEntityTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiLockReturnUnknown", GetMultiLockReturnUnknownTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiLockReturnMiss", GetMultiLockReturnMissTest(item.ctx, item.cacher))
+			t.Run("TestGetNamespacedKey", GetNamespacedKeyTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiPaths", GetMultiPathsTest(item.ctx, item.cacher))
+			t.Run("TestPropertyLoadSaver", PropertyLoadSaverTest(item.ctx, item.cacher))
+			t.Run("TestUnsupportedValueType", UnsupportedValueTypeTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiFieldMismatch", GetMultiFieldMismatchTest(item.ctx, item.cacher))
 		})
 	}
 }
@@ -36,7 +55,7 @@ func GetMultiStructTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiStructTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -82,7 +101,7 @@ func GetMultiStructPtrTest(c context.Context, cacher nds.Cacher) func(t *testing
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiStructPtrTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -135,7 +154,7 @@ func GetMultiStructPtrNilTest(c context.Context, cacher nds.Cacher) func(t *test
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiStructPtrNilTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -181,7 +200,7 @@ func GetMultiInterfaceTest(c context.Context, cacher nds.Cacher) func(t *testing
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiInterfaceTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -243,7 +262,7 @@ func GetMultiPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t 
 		entities := []datastore.PropertyList{}
 
 		for i := 1; i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", int64(i), nil))
+			keys = append(keys, datastore.IDKey("GetMultiPropertyLoadSaverTest", int64(i), nil))
 
 			pl, err := datastore.SaveStruct(&testEntity{i})
 			if err != nil {
@@ -335,7 +354,7 @@ func GetMultiInterfaceErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiInterfaceErrorTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -399,7 +418,7 @@ func GetArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 			t.Fatal("expected error for nil key")
 		}
 
-		key := datastore.IDKey("Entity", 1, nil)
+		key := datastore.IDKey("GetArgsTest", 1, nil)
 		if err := ndsClient.Get(c, key, nil); err != datastore.ErrInvalidEntityType {
 			t.Fatal("expected ErrInvalidEntityType for nil value")
 		}
@@ -430,7 +449,7 @@ func GetMultiArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 			IntVal int64
 		}
 
-		key := datastore.IDKey("Entity", 1, nil)
+		key := datastore.IDKey("GetMultiArgsTest", 1, nil)
 		keys := []*datastore.Key{key}
 		val := testEntity{}
 		if err := ndsClient.GetMulti(c, keys, nil); err == nil {
@@ -467,7 +486,7 @@ func GetSlicePropertyTest(c context.Context, cacher nds.Cacher) func(t *testing.
 			IntVals []int64
 		}
 
-		key := datastore.IDKey("Entity", 1, nil)
+		key := datastore.IDKey("GetSlicePropertyTest", 1, nil)
 		intVals := []int64{0, 1, 2, 3}
 		val := &testEntity{intVals}
 
@@ -504,7 +523,7 @@ func GetMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *te
 			t.Fatal(err)
 		}
 
-		keys := []*datastore.Key{datastore.IDKey("Test", 1, nil)}
+		keys := []*datastore.Key{datastore.IDKey("GetMultiNoPropertyListTest", 1, nil)}
 		pl := datastore.PropertyList{datastore.Property{}}
 
 		if err := ndsClient.GetMulti(c, keys, pl); err == nil {
@@ -520,7 +539,7 @@ func GetMultiNonStructTest(c context.Context, cacher nds.Cacher) func(t *testing
 			t.Fatal(err)
 		}
 
-		keys := []*datastore.Key{datastore.IDKey("Test", 1, nil)}
+		keys := []*datastore.Key{datastore.IDKey("GetMultiNonStructTest", 1, nil)}
 		vals := []int{12}
 
 		if err := ndsClient.GetMulti(c, keys, vals); err == nil {
@@ -546,7 +565,7 @@ func GetMultiLockReturnEntitySetValueFailTest(c context.Context, cacher nds.Cach
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiLockReturnEntitySetValueFailTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -571,12 +590,15 @@ func GetMultiLockReturnEntitySetValueFailTest(c context.Context, cacher nds.Cach
 			if err != nil {
 				return nil, err
 			}
+
 			items[keys[0]].Flags = nds.EntityItem
 			items[keys[0]].Value = value
 			items[keys[1]].Flags = nds.EntityItem
 			items[keys[1]].Value = value
 			return items, nil
 		}
+		close(cacheGetChan)
+
 		testCacher.getMultiHook = func(c context.Context,
 			keys []string) (map[string]*nds.Item, error) {
 			f := <-cacheGetChan
@@ -613,7 +635,7 @@ func GetMultiLockReturnEntityTest(c context.Context, cacher nds.Cacher) func(t *
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiLockReturnEntityTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -679,7 +701,7 @@ func GetMultiLockReturnUnknownTest(c context.Context, cacher nds.Cacher) func(t 
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiLockReturnUnknownTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -738,7 +760,7 @@ func GetMultiLockReturnMissTest(c context.Context, cacher nds.Cacher) func(t *te
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiLockReturnMissTest", i, nil))
 			entities = append(entities, testEntity{i})
 		}
 
@@ -794,8 +816,8 @@ func GetNamespacedKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.
 			IntVal int64
 		}
 
-		key := datastore.IDKey("Entity", 1, nil)
-		namespacedKey := datastore.IDKey("Entity", key.ID, nil)
+		key := datastore.IDKey("GetNamespacedKeyTest", 1, nil)
+		namespacedKey := datastore.IDKey("GetNamespacedKeyTest", key.ID, nil)
 		namespacedKey.Namespace = ns
 		entity := &testEntity{intVal}
 
@@ -901,7 +923,7 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 
 			keys, vals := make([]*datastore.Key, count), make([]testEntity, count)
 			for i := int64(0); i < count; i++ {
-				keys[i] = datastore.IDKey("Entity", i+1, nil)
+				keys[i] = datastore.IDKey("GetMultiPathsTest", i+1, nil)
 				vals[i] = testEntity{i + 1}
 			}
 			return keys, vals
@@ -934,11 +956,11 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				20,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
-					testCacher.GetMulti,
+					cacher.GetMulti,
+					cacher.GetMulti,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -952,11 +974,11 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				2,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
-					testCacher.GetMulti,
+					cacher.GetMulti,
+					cacher.GetMulti,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				datastoreGetMultiFail,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -970,11 +992,11 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				2,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
-					testCacher.GetMulti,
+					cacher.GetMulti,
+					cacher.GetMulti,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				func(c context.Context,
 					keys []*datastore.Key, vals interface{}) error {
 
@@ -998,11 +1020,11 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				5,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
-					testCacher.GetMulti,
+					cacher.GetMulti,
+					cacher.GetMulti,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				marshalFail,
 				[]unmarshalFunc{
@@ -1034,11 +1056,11 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				20,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
+					cacher.GetMulti,
 					cacheGetMultiFail,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -1053,22 +1075,22 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				2,
 				[]cacheGetMultiFunc{
 					// Charge cache.
-					testCacher.GetMulti,
-					testCacher.GetMulti,
+					cacher.GetMulti,
+					cacher.GetMulti,
 					// Corrupt cache.
 					func(c context.Context, keys []string) (
 						map[string]*nds.Item, error) {
-						items, err := testCacher.GetMulti(c, keys)
+						items, err := cacher.GetMulti(c, keys)
 						// Corrupt items.
 						for _, item := range items {
 							item.Value = []byte("corrupt string")
 						}
 						return items, err
 					},
-					testCacher.GetMulti,
+					cacher.GetMulti,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -1085,22 +1107,22 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				2,
 				[]cacheGetMultiFunc{
 					// Charge cache.
-					testCacher.GetMulti,
-					testCacher.GetMulti,
+					cacher.GetMulti,
+					cacher.GetMulti,
 					// Corrupt cache flags.
 					func(c context.Context, keys []string) (
 						map[string]*nds.Item, error) {
-						items, err := testCacher.GetMulti(c, keys)
+						items, err := cacher.GetMulti(c, keys)
 						// Corrupt flags with unknown number.
 						for _, item := range items {
 							item.Flags = 56
 						}
 						return items, err
 					},
-					testCacher.GetMulti,
+					cacher.GetMulti,
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -1116,10 +1138,10 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				20,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
+					cacher.GetMulti,
 					func(c context.Context, keys []string) (
 						map[string]*nds.Item, error) {
-						items, err := testCacher.GetMulti(c, keys)
+						items, err := cacher.GetMulti(c, keys)
 						// Corrupt flags with unknown number.
 						for _, item := range items {
 							item.Value = []byte("corrupt value")
@@ -1127,8 +1149,8 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 						return items, err
 					},
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -1142,10 +1164,10 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				2,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
+					cacher.GetMulti,
 					func(c context.Context, keys []string) (
 						map[string]*nds.Item, error) {
-						items, err := testCacher.GetMulti(c, keys)
+						items, err := cacher.GetMulti(c, keys)
 						// Corrupt flags with unknown number.
 						for _, item := range items {
 							item.Flags = nds.NoneItem
@@ -1153,8 +1175,8 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 						return items, err
 					},
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -1173,10 +1195,10 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				2,
 				1,
 				[]cacheGetMultiFunc{
-					testCacher.GetMulti,
+					cacher.GetMulti,
 					func(c context.Context, keys []string) (
 						map[string]*nds.Item, error) {
-						items, err := testCacher.GetMulti(c, keys)
+						items, err := cacher.GetMulti(c, keys)
 						// Corrupt flags with unknown number.
 						for _, item := range items {
 							item.Flags = nds.EntityItem
@@ -1184,8 +1206,8 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 						return items, err
 					},
 				},
-				testCacher.AddMulti,
-				testCacher.CompareAndSwapMulti,
+				cacher.AddMulti,
+				cacher.CompareAndSwapMulti,
 				nil,
 				nds.MarshalPropertyList,
 				[]unmarshalFunc{
@@ -1197,105 +1219,107 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 		}
 
 		for _, test := range tests {
-			t.Log("Start", test.description)
+			t.Run(test.description, func(t *testing.T) {
 
-			keys, putVals := keysVals(c, test.keyCount)
-			if _, err := ndsClient.PutMulti(c, keys, putVals); err != nil {
-				t.Fatal(err)
-			}
-
-			cacheGetChan := make(chan cacheGetMultiFunc,
-				len(test.cacheGetMultis))
-
-			for _, fn := range test.cacheGetMultis {
-				cacheGetChan <- fn
-			}
-
-			testCacher.getMultiHook = func(c context.Context, keys []string) (
-				map[string]*nds.Item, error) {
-				fn := <-cacheGetChan
-				return fn(c, keys)
-			}
-
-			testCacher.addMultiHook = test.cacheAddMulti
-			testCacher.compareAndSwapHook = test.cacheCompareAndSwapMulti
-
-			nds.SetDatastoreGetMultiHook(test.datastoreGetMulti)
-
-			nds.SetMarshal(test.marshal)
-
-			unmarshalChan := make(chan unmarshalFunc,
-				len(test.unmarshals))
-
-			for _, fn := range test.unmarshals {
-				unmarshalChan <- fn
-			}
-
-			nds.SetUnmarshal(func(data []byte, pl *datastore.PropertyList) error {
-				fn := <-unmarshalChan
-				return fn(data, pl)
-			})
-
-			for i := 0; i < test.callCount; i++ {
-				getVals := make([]testEntity, test.keyCount)
-				err := ndsClient.GetMulti(c, keys, getVals)
-
-				expectedErr := test.expectedErrs[i]
-
-				if expectedErr == nil {
-					if err != nil {
-						t.Fatal(err)
-					}
-
-					for i := range getVals {
-						if getVals[i].IntVal != putVals[i].IntVal {
-							t.Fatal("incorrect IntVal")
-						}
-					}
-					continue
+				keys, putVals := keysVals(c, test.keyCount)
+				if _, err := ndsClient.PutMulti(c, keys, putVals); err != nil {
+					t.Fatal(err)
 				}
 
-				if err == nil {
-					t.Fatal("expected error")
+				cacheGetChan := make(chan cacheGetMultiFunc,
+					len(test.cacheGetMultis))
+
+				for _, fn := range test.cacheGetMultis {
+					cacheGetChan <- fn
 				}
-				expectedMultiErr, isMultiErr := expectedErr.(datastore.MultiError)
+				close(cacheGetChan)
 
-				if isMultiErr {
-					me, ok := err.(datastore.MultiError)
-					if !ok {
-						t.Fatal("expected datastore.MultiError but got", err)
-					}
+				testCacher.getMultiHook = func(c context.Context, keys []string) (
+					map[string]*nds.Item, error) {
+					fn := <-cacheGetChan
+					return fn(c, keys)
+				}
 
-					if len(me) != len(expectedMultiErr) {
-						t.Fatal("datastore.MultiError length incorrect")
-					}
+				testCacher.addMultiHook = test.cacheAddMulti
+				testCacher.compareAndSwapHook = test.cacheCompareAndSwapMulti
 
-					for i, e := range me {
-						if e != expectedMultiErr[i] {
-							t.Fatal("non matching errors", e, expectedMultiErr[i])
+				nds.SetDatastoreGetMultiHook(test.datastoreGetMulti)
+
+				nds.SetMarshal(test.marshal)
+
+				unmarshalChan := make(chan unmarshalFunc,
+					len(test.unmarshals))
+
+				for _, fn := range test.unmarshals {
+					unmarshalChan <- fn
+				}
+				close(unmarshalChan)
+
+				nds.SetUnmarshal(func(data []byte, pl *datastore.PropertyList) error {
+					fn := <-unmarshalChan
+					return fn(data, pl)
+				})
+
+				for i := 0; i < test.callCount; i++ {
+					getVals := make([]testEntity, test.keyCount)
+					err := ndsClient.GetMulti(c, keys, getVals)
+
+					expectedErr := test.expectedErrs[i]
+
+					if expectedErr == nil {
+						if err != nil {
+							t.Fatal(err)
 						}
 
-						if e == nil {
+						for i := range getVals {
 							if getVals[i].IntVal != putVals[i].IntVal {
 								t.Fatal("incorrect IntVal")
 							}
 						}
+						continue
+					}
+
+					if err == nil {
+						t.Fatal("expected error")
+					}
+					expectedMultiErr, isMultiErr := expectedErr.(datastore.MultiError)
+
+					if isMultiErr {
+						me, ok := err.(datastore.MultiError)
+						if !ok {
+							t.Fatal("expected datastore.MultiError but got", err)
+						}
+
+						if len(me) != len(expectedMultiErr) {
+							t.Fatal("datastore.MultiError length incorrect")
+						}
+
+						for i, e := range me {
+							if e != expectedMultiErr[i] {
+								t.Fatal("non matching errors", e, expectedMultiErr[i])
+							}
+
+							if e == nil {
+								if getVals[i].IntVal != putVals[i].IntVal {
+									t.Fatal("incorrect IntVal")
+								}
+							}
+						}
 					}
 				}
-			}
 
-			// Reset App Engine API calls.
-			testCacher.getMultiHook = nil
-			testCacher.addMultiHook = nil
-			testCacher.compareAndSwapHook = nil
-			nds.SetDatastoreGetMultiHook(nil)
-			nds.SetMarshal(nds.MarshalPropertyList)
-			nds.SetUnmarshal(nds.UnmarshalPropertyList)
+				// Reset App Engine API calls.
+				testCacher.getMultiHook = nil
+				testCacher.addMultiHook = nil
+				testCacher.compareAndSwapHook = nil
+				nds.SetDatastoreGetMultiHook(nil)
+				nds.SetMarshal(nds.MarshalPropertyList)
+				nds.SetUnmarshal(nds.UnmarshalPropertyList)
 
-			if err := ndsClient.DeleteMulti(c, keys); err != nil {
-				t.Fatal(err)
-			}
-			t.Log("End", test.description)
+				if err := ndsClient.DeleteMulti(c, keys); err != nil {
+					t.Fatal(err)
+				}
+			})
 		}
 	}
 }
@@ -1332,7 +1356,7 @@ func PropertyLoadSaverTest(ctx context.Context, cacher nds.Cacher) func(t *testi
 		}
 
 		keys := []*datastore.Key{
-			datastore.IncompleteKey("Entity", nil),
+			datastore.IncompleteKey("PropertyLoadSaverTest", nil),
 		}
 		entities := []*loadSaveStruct{
 			&loadSaveStruct{
@@ -1363,7 +1387,7 @@ func UnsupportedValueTypeTest(ctx context.Context, cacher nds.Cacher) func(t *te
 		}
 
 		keys := []*datastore.Key{
-			datastore.IncompleteKey("Entity", nil),
+			datastore.IncompleteKey("UnsupportedValueTypeTest", nil),
 		}
 		entities := make([]int, 1)
 		if err := ndsClient.GetMulti(ctx, keys, entities); err == nil {
@@ -1396,7 +1420,7 @@ func GetMultiFieldMismatchTest(c context.Context, cacher nds.Cacher) func(t *tes
 		keys := []*datastore.Key{}
 		entities := []testEntity{}
 		for i := int64(1); i < 3; i++ {
-			keys = append(keys, datastore.IDKey("Entity", i, nil))
+			keys = append(keys, datastore.IDKey("GetMultiFieldMismatchTest", i, nil))
 			entities = append(entities, testEntity{i, i})
 		}
 
