@@ -30,7 +30,7 @@ func TestPutSuite(t *testing.T) {
 
 func PutMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -62,7 +62,7 @@ func PutMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func PutMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,7 +105,7 @@ func PutMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 
 func PutMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +121,7 @@ func PutMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *te
 
 func PutPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -161,7 +161,7 @@ func PutPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t *test
 
 func PutNilArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +180,7 @@ func PutMultiLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testi
 			},
 		}
 
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -208,7 +208,7 @@ func PutMultiUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t
 			},
 		}
 
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,7 +239,7 @@ func PutDatastoreMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 		})
 		defer nds.SetDatastorePutMultiHook(nil)
 
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -261,7 +261,7 @@ func PutDatastoreMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 
 func PutMultiZeroKeysTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}

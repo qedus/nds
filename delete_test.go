@@ -26,7 +26,7 @@ func TestDeleteSuite(t *testing.T) {
 
 func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +80,7 @@ func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 // Test will panic, see https://github.com/GoogleCloudPlatform/google-cloud-go/issues/1175
 // func DeleteNilKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 // 	return func(t *testing.T) {
-// 		ndsClient, err := NewClient(c, cacher)
+// 		ndsClient, err := NewClient(c, cacher, t)
 // 		if err != nil {
 // 			t.Fatal(err)
 // 		}
@@ -93,7 +93,7 @@ func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func DeleteIncompleteKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +111,7 @@ func DeleteCacheFailTest(c context.Context, cacher nds.Cacher) func(t *testing.T
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +141,7 @@ func DeleteCacheFailTest(c context.Context, cacher nds.Cacher) func(t *testing.T
 
 func DeleteInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}

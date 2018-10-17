@@ -47,7 +47,7 @@ func TestMemcacheNamespace(t *testing.T) {
 
 	// Illegal namespace chars.
 	cacher := memcache.NewCacher("£££")
-	ndsClient, err := NewClient(c, cacher)
+	ndsClient, err := NewClient(c, cacher, t)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,7 +22,7 @@ func TestTransactionSuite(t *testing.T) {
 
 func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testin
 // RunInTransaction is using a namespace.
 func ClearNamespacedLocksTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -43,7 +43,7 @@ func TestGetSuite(t *testing.T) {
 
 func GetMultiStructTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +89,7 @@ func GetMultiStructTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 
 func GetMultiStructPtrTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +142,7 @@ func GetMultiStructPtrTest(c context.Context, cacher nds.Cacher) func(t *testing
 
 func GetMultiStructPtrNilTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -188,7 +188,7 @@ func GetMultiStructPtrNilTest(c context.Context, cacher nds.Cacher) func(t *test
 
 func GetMultiInterfaceTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,7 +249,7 @@ func GetMultiInterfaceTest(c context.Context, cacher nds.Cacher) func(t *testing
 
 func GetMultiPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -322,7 +322,7 @@ func GetMultiPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t 
 
 func GetMultiNoKeysTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func GetMultiNoKeysTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 
 func GetMultiInterfaceErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -405,7 +405,7 @@ func newReaderTestEntity() io.Reader {
 
 func GetArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -440,7 +440,7 @@ func GetArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func GetMultiArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -477,7 +477,7 @@ func GetMultiArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func GetSlicePropertyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -518,7 +518,7 @@ func GetSlicePropertyTest(c context.Context, cacher nds.Cacher) func(t *testing.
 
 func GetMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -534,7 +534,7 @@ func GetMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *te
 
 func GetMultiNonStructTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -553,7 +553,7 @@ func GetMultiLockReturnEntitySetValueFailTest(c context.Context, cacher nds.Cach
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -623,7 +623,7 @@ func GetMultiLockReturnEntityTest(c context.Context, cacher nds.Cacher) func(t *
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -689,7 +689,7 @@ func GetMultiLockReturnUnknownTest(c context.Context, cacher nds.Cacher) func(t 
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -748,7 +748,7 @@ func GetMultiLockReturnMissTest(c context.Context, cacher nds.Cacher) func(t *te
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher)
+		ndsClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -805,7 +805,7 @@ func GetMultiLockReturnMissTest(c context.Context, cacher nds.Cacher) func(t *te
 // the cache uses the namespace from the key instead of the context.
 func GetNamespacedKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -866,10 +866,6 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
-		}
-		ndsClient, err := NewClient(c, testCacher)
-		if err != nil {
-			t.Fatal(err)
 		}
 
 		expectedErr := errors.New("expected error")
@@ -1220,6 +1216,10 @@ func GetMultiPathsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 
 		for _, test := range tests {
 			t.Run(test.description, func(t *testing.T) {
+				ndsClient, err := NewClient(c, testCacher, t)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				keys, putVals := keysVals(c, test.keyCount)
 				if _, err := ndsClient.PutMulti(c, keys, putVals); err != nil {
@@ -1350,7 +1350,7 @@ func (lss *loadSaveStruct) Load(properties []datastore.Property) error {
 
 func PropertyLoadSaverTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1381,7 +1381,7 @@ func PropertyLoadSaverTest(ctx context.Context, cacher nds.Cacher) func(t *testi
 
 func UnsupportedValueTypeTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1403,7 +1403,7 @@ func GetMultiFieldMismatchTest(c context.Context, cacher nds.Cacher) func(t *tes
 			t.Fatal(err)
 		}
 
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}

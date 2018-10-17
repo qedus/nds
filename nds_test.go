@@ -147,12 +147,16 @@ func TestMain(m *testing.M) {
 	os.Exit(retCode)
 }
 
-func NewClient(c context.Context, cacher nds.Cacher) (*nds.Client, error) {
+func NewClient(c context.Context, cacher nds.Cacher, t *testing.T) (*nds.Client, error) {
 	dsclient, err := datastore.NewClient(c, "")
 	if err != nil {
 		return nil, err
 	}
-	return nds.NewClient(c, &nds.Config{CacheBackend: cacher, DatastoreClient: dsclient}), nil
+	config := &nds.Config{CacheBackend: cacher, DatastoreClient: dsclient}
+	config.OnError = func(_ context.Context, err error) {
+		t.Log(err)
+	}
+	return nds.NewClient(c, config), nil
 }
 
 func TestCachers(t *testing.T) {
@@ -195,7 +199,7 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 			return nil
 		})
 
-		nsdClient, err := NewClient(c, testCacher)
+		nsdClient, err := NewClient(c, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -272,7 +276,7 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -353,7 +357,7 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func GetMultiNoSuchEntityTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -390,7 +394,7 @@ func GetMultiNoSuchEntityTest(c context.Context, cacher nds.Cacher) func(t *test
 
 func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -437,7 +441,7 @@ func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.
 
 func GetMultiErrorMixTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -505,7 +509,7 @@ func GetMultiErrorMixTest(c context.Context, cacher nds.Cacher) func(t *testing.
 
 func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -642,7 +646,7 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func RunInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher)
+		ndsClient, err := NewClient(c, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
