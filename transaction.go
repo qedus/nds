@@ -98,6 +98,22 @@ func (t *Transaction) Query(q *datastore.Query) *datastore.Query {
 	return q.Transaction(t.tx)
 }
 
+// Mutate will lock all keys from the mutations provided.
+func (t *Transaction) Mutate(muts ...*Mutation) ([]*datastore.PendingKey, error) {
+	mutations := make([]*datastore.Mutation, len(muts))
+	keys := make([]*datastore.Key, len(muts))
+	for i, mut := range muts {
+		mutations[i] = mut.mut
+		keys[i] = mut.k
+	}
+	_, lockCacheItems := getCacheLocks(keys)
+	t.Lock()
+	t.lockCacheItems = append(t.lockCacheItems,
+		lockCacheItems...)
+	t.Unlock()
+	return t.tx.Mutate(mutations...)
+}
+
 // RunInTransaction works just like datastore.RunInTransaction however it
 // interacts correctly with the cache. You should always use this method for
 // transactions if you are using the NDS package.

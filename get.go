@@ -341,14 +341,13 @@ func (c *Client) loadDatastore(ctx context.Context, cacheItems []cacheItem,
 		}
 	}
 
-	var me datastore.MultiError
-
 	if getMultiHook != nil {
 		if err := getMultiHook(ctx, keys, vals); err != nil {
 			return err
 		}
 	}
 
+	var me datastore.MultiError
 	if err := c.ds.GetMulti(ctx, keys, vals); err == nil {
 		me = make(datastore.MultiError, len(keys))
 	} else if e, ok := err.(datastore.MultiError); ok {
