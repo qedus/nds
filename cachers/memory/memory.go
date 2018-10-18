@@ -36,12 +36,17 @@ func (m *memory) NewContext(c context.Context) (context.Context, error) {
 	return c, nil
 }
 
-func (m *memory) AddMulti(_ context.Context, items []*nds.Item) error {
+func (m *memory) AddMulti(ctx context.Context, items []*nds.Item) error {
 	m.RLock()
 	defer m.RUnlock()
 	me := make(nds.MultiError, len(items))
 	hasErr := false
 	for i, item := range items {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		if err := m.store.Add(item.Key, &object{flags: item.Flags, value: append([]byte(nil), item.Value...)}, item.Expiration); err != nil {
 			me[i] = nds.ErrNotStored
 			hasErr = true
@@ -53,12 +58,17 @@ func (m *memory) AddMulti(_ context.Context, items []*nds.Item) error {
 	return nil
 }
 
-func (m *memory) CompareAndSwapMulti(_ context.Context, items []*nds.Item) error {
+func (m *memory) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) error {
 	m.Lock() // No other cache operations should happen while we do our CAS operations, here to make the ops "atomic"
 	defer m.Unlock()
 	me := make(nds.MultiError, len(items))
 	hasErr := false
 	for i, item := range items {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		if cacheItem, found := m.store.Get(item.Key); found {
 			obj := cacheItem.(*object)
 			ndsItem := &nds.Item{
@@ -85,22 +95,41 @@ func (m *memory) CompareAndSwapMulti(_ context.Context, items []*nds.Item) error
 	return nil
 }
 
-func (m *memory) DeleteMulti(_ context.Context, keys []string) error {
+func (m *memory) DeleteMulti(ctx context.Context, keys []string) error {
 	m.RLock()
 	defer m.RUnlock()
-	for _, key := range keys {
+	me := make(nds.MultiError, len(keys))
+	hasErr := false
+	for i, key := range keys {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if _, ok := m.store.Get(key); !ok {
+			me[i] = nds.ErrCacheMiss
+			hasErr = true
+		}
 		m.store.Delete(key)
+	}
+	if hasErr {
+		return me
 	}
 	return nil
 }
 
-func (m *memory) GetMulti(_ context.Context, keys []string) (map[string]*nds.Item, error) {
+func (m *memory) GetMulti(ctx context.Context, keys []string) (map[string]*nds.Item, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
 	result := make(map[string]*nds.Item)
 
 	for _, key := range keys {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		if cacheItem, found := m.store.Get(key); found {
 			obj := cacheItem.(*object)
 			ndsItem := &nds.Item{
@@ -119,10 +148,15 @@ func (m *memory) GetMulti(_ context.Context, keys []string) (map[string]*nds.Ite
 	return result, nil
 }
 
-func (m *memory) SetMulti(_ context.Context, items []*nds.Item) error {
+func (m *memory) SetMulti(ctx context.Context, items []*nds.Item) error {
 	m.RLock()
 	defer m.RUnlock()
 	for _, item := range items {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		m.store.Set(item.Key, &object{flags: item.Flags, value: append([]byte(nil), item.Value...)}, item.Expiration)
 	}
 	return nil
