@@ -161,7 +161,7 @@ func CacherImplementationTest(ctx context.Context, cacher nds.Cacher) func(t *te
 						for i, item := range tt.args.items {
 							keys[i] = item.Key
 							if item.Expiration > 0 {
-								time.Sleep(item.Expiration)
+								time.Sleep(item.Expiration + (10 * time.Millisecond))
 							}
 						}
 					}
@@ -203,15 +203,15 @@ func CacherImplementationTest(ctx context.Context, cacher nds.Cacher) func(t *te
 					if tt.setWant {
 						return
 					}
-					keysToGet := make([]string, len(tt.args.items))
+					keys := make([]string, len(tt.args.items))
 					for i, item := range tt.args.items {
-						keysToGet[i] = item.Key
+						keys[i] = item.Key
 						if item.Expiration > 0 {
-							time.Sleep(item.Expiration)
+							time.Sleep(item.Expiration + (10 * time.Millisecond))
 						}
 					}
 					foundSet := make(map[string]*nds.Item)
-					result, err := cacher.GetMulti(tt.args.c, keysToGet)
+					result, err := cacher.GetMulti(tt.args.c, keys)
 					if err != nil {
 						t.Errorf("wanted err = nil, got %v", err)
 						return
@@ -370,7 +370,7 @@ func CacherImplementationTest(ctx context.Context, cacher nds.Cacher) func(t *te
 				t.Errorf("expecting err = nil, got %v", err)
 			}
 
-			time.Sleep(result[succeedItem.Key].Expiration)
+			time.Sleep(result[succeedItem.Key].Expiration + (10 * time.Millisecond))
 
 			if result, err := cacher.GetMulti(ctx, []string{succeedItem.Key}); err != nil {
 				t.Errorf("expected err = nil,  got %v", err)
