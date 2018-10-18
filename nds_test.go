@@ -116,13 +116,19 @@ func initRedis() {
 	}
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
-		panic("expecting REDIS_ADDR")
+		redisAddr = "localhost:6379"
 	}
 
 	redisPool := &redis.Pool{
 		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", redisAddr, redis.DialReadTimeout(time.Second))
+			return redis.Dial("tcp", redisAddr, redis.DialReadTimeout(500*time.Millisecond))
 		},
+	}
+
+	// Flush cache
+	conn := redisPool.Get()
+	if _, err := conn.Do("FLUSHDB"); err != nil {
+		panic(err)
 	}
 
 	cacher, err := credis.NewCacher(context.Background(), redisPool)
