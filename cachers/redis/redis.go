@@ -19,7 +19,11 @@ const (
 	maxCacheSize = (1 << 20)
 
 	casScript = `local exp = tonumber(ARGV[3])
-	if redis.call("get",KEYS[1]) == ARGV[1]
+	local orig = redis.call("get", KEYS[1])
+	if not orig then
+		return nil
+	end
+	if orig == ARGV[1]
 	then
 		if exp >= 0
 		then
@@ -73,16 +77,21 @@ func (b *backend) AddMulti(ctx context.Context, items []*nds.Item) error {
 	}
 	defer redisConn.Close()
 
-	return set(redisConn, true, items)
+	return set(ctx, redisConn, true, items)
 }
 
-func set(conn redis.Conn, nx bool, items []*nds.Item) error {
+func set(ctx context.Context, conn redis.Conn, nx bool, items []*nds.Item) error {
 	me := make(nds.MultiError, len(items))
 	hasErr := false
 	var flushErr error
 	go func() {
 		buf := bufPool.Get().(*bytes.Buffer)
 		for i, item := range items {
+			select {
+			case <-ctx.Done():
+				break
+			default:
+			}
 			buf.Reset()
 			buf.Grow(4 + len(item.Value))
 			binary.Write(buf, binary.LittleEndian, item.Flags)
@@ -108,24 +117,38 @@ func set(conn redis.Conn, nx bool, items []*nds.Item) error {
 		}
 	}()
 
-	for i := 0; i < len(items); i++ {
-		if flushErr != nil {
-			break
-		}
-		if me[i] != nil {
-			// We couldn't queue the command so don't expect it's response
-			hasErr = true
-			continue
-		}
-		if _, err := conn.Receive(); err != nil {
-			if nx && err == redis.ErrNil {
-				me[i] = nds.ErrNotStored
-			} else {
-				me[i] = err
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < len(items); i++ {
+			select {
+			case <-ctx.Done():
+				flushErr = ctx.Err()
+				break
+			default:
 			}
-			hasErr = true
+			if flushErr != nil {
+				break
+			}
+			if me[i] != nil {
+				// We couldn't queue the command so don't expect it's response
+				hasErr = true
+				continue
+			}
+			if _, err := redis.String(conn.Receive()); err != nil {
+				if nx && err == redis.ErrNil {
+					me[i] = nds.ErrNotStored
+				} else {
+					me[i] = err
+				}
+				hasErr = true
+			}
 		}
-	}
+	}()
+
+	wg.Wait()
 
 	if flushErr != nil {
 		return flushErr
@@ -151,6 +174,11 @@ func (b *backend) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) er
 	go func() {
 		buf := bufPool.Get().(*bytes.Buffer)
 		for i, item := range items {
+			select {
+			case <-ctx.Done():
+				break
+			default:
+			}
 			if cas, ok := item.GetCASInfo().([]byte); ok && cas != nil {
 				buf.Reset()
 				buf.Grow(4 + len(item.Value))
@@ -173,26 +201,41 @@ func (b *backend) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) er
 		}
 	}()
 
-	for i := 0; i < len(items); i++ {
-		if flushErr != nil {
-			break
-		}
-		if me[i] != nil {
-			// We couldn't queue the command so don't expect it's response
-			hasErr = true
-			continue
-		}
-		if _, err := redisConn.Receive(); err != nil {
-			if err == redis.ErrNil {
-				me[i] = nds.ErrNotStored
-			} else if err.Error() == "cas conflict" {
-				me[i] = nds.ErrCASConflict
-			} else {
-				me[i] = err
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		for i := 0; i < len(items); i++ {
+			select {
+			case <-ctx.Done():
+				flushErr = ctx.Err()
+				break
+			default:
 			}
-			hasErr = true
+			if flushErr != nil {
+				break
+			}
+			if me[i] != nil {
+				// We couldn't queue the command so don't expect it's response
+				hasErr = true
+				continue
+			}
+			if _, err := redis.String(redisConn.Receive()); err != nil {
+				if err == redis.ErrNil {
+					me[i] = nds.ErrNotStored
+				} else if err.Error() == "cas conflict" {
+					me[i] = nds.ErrCASConflict
+				} else {
+					me[i] = err
+				}
+				hasErr = true
+			}
 		}
-	}
+	}()
+
+	wg.Wait()
 
 	if flushErr != nil {
 		return flushErr
@@ -211,42 +254,25 @@ func (b *backend) DeleteMulti(ctx context.Context, keys []string) error {
 	}
 	defer redisConn.Close()
 
-	me := make(nds.MultiError, len(keys))
-	hasErr := false
-	var flushErr error
-	go func() {
-		for i, key := range keys {
-			if err := redisConn.Send("DEL", key); err != nil {
-				me[i] = err
-			}
-		}
-		flushErr = redisConn.Flush()
-	}()
-
-	for i := 0; i < len(keys); i++ {
-		if flushErr != nil {
-			break
-		}
-		if me[i] != nil {
-			// We couldn't queue the command so don't expect it's response
-			hasErr = true
-			continue
-		}
-		if n, err := redis.Int64(redisConn.Receive()); err != nil {
-			me[i] = err
-			hasErr = true
-		} else if n != 1 {
-			me[i] = nds.ErrCacheMiss
-			hasErr = true
-		}
+	if len(keys) == 0 {
+		return nil
 	}
 
-	if flushErr != nil {
-		return flushErr
+	args := make([]interface{}, len(keys))
+	for i, key := range keys {
+		args[i] = key
 	}
 
-	if hasErr {
-		return me
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	if num, err := redis.Int64(redisConn.Do("DEL", args...)); err != nil {
+		return err
+	} else if num != int64(len(keys)) {
+		return fmt.Errorf("redis: expected to remove %d keys, but only removed %d", len(keys), num)
 	}
 	return nil
 }
@@ -264,6 +290,12 @@ func (b *backend) GetMulti(ctx context.Context, keys []string) (map[string]*nds.
 	args := make([]interface{}, len(keys))
 	for i, key := range keys {
 		args[i] = key
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
 	cachedItems, err := redis.ByteSlices(redisConn.Do("MGET", args...))
@@ -316,5 +348,5 @@ func (b *backend) SetMulti(ctx context.Context, items []*nds.Item) error {
 	}
 	defer redisConn.Close()
 
-	return set(redisConn, false, items)
+	return set(ctx, redisConn, false, items)
 }
