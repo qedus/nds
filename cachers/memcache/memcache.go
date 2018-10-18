@@ -4,14 +4,12 @@ import (
 	"context"
 
 	"google.golang.org/appengine"
-	ogmem "google.golang.org/appengine/memcache"
+	"google.golang.org/appengine/memcache"
 
 	"github.com/qedus/nds"
 )
 
-// TODO: Convert appengine.MultiError to nds.MultiError for consistency
-
-type memcache struct {
+type backend struct {
 	// namespace is the namespace where all memcached entities are
 	// stored.
 	namespace string
@@ -20,48 +18,48 @@ type memcache struct {
 // NewCacher will return a nds.Cacher backed by AppEngine's memcache,
 // utilizing the provided namespace, if any.
 func NewCacher(namespace string) nds.Cacher {
-	return &memcache{namespace}
+	return &backend{namespace}
 }
 
-func (m *memcache) NewContext(c context.Context) (context.Context, error) {
+func (m *backend) NewContext(c context.Context) (context.Context, error) {
 	return appengine.Namespace(c, m.namespace)
 }
 
-func (m *memcache) AddMulti(c context.Context, items []*nds.Item) error {
-	return ogmem.AddMulti(c, convertToMemcacheItems(items))
+func (m *backend) AddMulti(c context.Context, items []*nds.Item) error {
+	return convertToNDSMultiError(memcache.AddMulti(c, convertToMemcacheItems(items)))
 }
 
-func (m *memcache) CompareAndSwapMulti(c context.Context, items []*nds.Item) error {
-	return ogmem.CompareAndSwapMulti(c, convertToMemcacheItems(items))
+func (m *backend) CompareAndSwapMulti(c context.Context, items []*nds.Item) error {
+	return convertToNDSMultiError(memcache.CompareAndSwapMulti(c, convertToMemcacheItems(items)))
 }
 
-func (m *memcache) DeleteMulti(c context.Context, keys []string) error {
-	return ogmem.DeleteMulti(c, keys)
+func (m *backend) DeleteMulti(c context.Context, keys []string) error {
+	return convertToNDSMultiError(memcache.DeleteMulti(c, keys))
 }
 
-func (m *memcache) GetMulti(c context.Context, keys []string) (map[string]*nds.Item, error) {
-	items, err := ogmem.GetMulti(c, keys)
+func (m *backend) GetMulti(c context.Context, keys []string) (map[string]*nds.Item, error) {
+	items, err := memcache.GetMulti(c, keys)
 	if err != nil {
-		return nil, err
+		return nil, convertToNDSMultiError(err)
 	}
 	return convertFromMemcacheItems(items), nil
 }
 
-func (m *memcache) SetMulti(c context.Context, items []*nds.Item) error {
-	return ogmem.SetMulti(c, convertToMemcacheItems(items))
+func (m *backend) SetMulti(c context.Context, items []*nds.Item) error {
+	return memcache.SetMulti(c, convertToMemcacheItems(items))
 }
 
-func convertToMemcacheItems(items []*nds.Item) []*ogmem.Item {
-	newItems := make([]*ogmem.Item, len(items))
+func convertToMemcacheItems(items []*nds.Item) []*memcache.Item {
+	newItems := make([]*memcache.Item, len(items))
 	for i, item := range items {
-		if memcacheItem, ok := item.GetCASInfo().(*ogmem.Item); ok {
+		if memcacheItem, ok := item.GetCASInfo().(*memcache.Item); ok {
 			memcacheItem.Value = item.Value
 			memcacheItem.Flags = item.Flags
 			memcacheItem.Expiration = item.Expiration
 			memcacheItem.Key = item.Key
 			newItems[i] = memcacheItem
 		} else {
-			newItems[i] = &ogmem.Item{
+			newItems[i] = &memcache.Item{
 				Expiration: item.Expiration,
 				Flags:      item.Flags,
 				Key:        item.Key,
@@ -72,7 +70,7 @@ func convertToMemcacheItems(items []*nds.Item) []*ogmem.Item {
 	return newItems
 }
 
-func convertFromMemcacheItems(items map[string]*ogmem.Item) map[string]*nds.Item {
+func convertFromMemcacheItems(items map[string]*memcache.Item) map[string]*nds.Item {
 	newItems := make(map[string]*nds.Item)
 	for key, item := range items {
 		newItems[key] = &nds.Item{
@@ -84,4 +82,24 @@ func convertFromMemcacheItems(items map[string]*ogmem.Item) map[string]*nds.Item
 		newItems[key].SetCASInfo(item)
 	}
 	return newItems
+}
+
+func convertToNDSMultiError(err error) error {
+	if ame, ok := err.(appengine.MultiError); ok {
+		me := make(nds.MultiError, len(ame))
+		for i, aerr := range ame {
+			switch aerr {
+			case memcache.ErrNotStored:
+				me[i] = nds.ErrNotStored
+			case memcache.ErrCacheMiss:
+				me[i] = nds.ErrCacheMiss
+			case memcache.ErrCASConflict:
+				me[i] = nds.ErrCASConflict
+			default:
+				me[i] = aerr
+			}
+		}
+		return me
+	}
+	return err
 }
