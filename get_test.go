@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/datastore"
@@ -21,6 +22,7 @@ func TestGetSuite(t *testing.T) {
 			t.Run("TestGetMultiStructPtrNil", GetMultiStructPtrNilTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiInterface", GetMultiInterfaceTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiPropertyLoadSaver", GetMultiPropertyLoadSaverTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiKeyLoader", GetMultiKeyLoaderTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiNoKeys", GetMultiNoKeysTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiInterfaceError", GetMultiInterfaceErrorTest(item.ctx, item.cacher))
 			t.Run("TestGetArgs", GetArgsTest(item.ctx, item.cacher))
@@ -35,8 +37,10 @@ func TestGetSuite(t *testing.T) {
 			t.Run("TestGetNamespacedKey", GetNamespacedKeyTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiPaths", GetMultiPathsTest(item.ctx, item.cacher))
 			t.Run("TestPropertyLoadSaver", PropertyLoadSaverTest(item.ctx, item.cacher))
+			t.Run("TestKeyLoader", KeyLoaderTest(item.ctx, item.cacher))
 			t.Run("TestUnsupportedValueType", UnsupportedValueTypeTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiFieldMismatch", GetMultiFieldMismatchTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiExpiredContext", GetMultiExpiredContextTest(item.ctx, item.cacher))
 		})
 	}
 }
@@ -314,6 +318,103 @@ func GetMultiPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t 
 		defer nds.SetDatastoreGetMultiHook(nil)
 
 		tes := make([]testEntity, len(entities))
+		if err := ndsClient.GetMulti(c, keys, tes); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+type keyLoaderTest struct {
+	I    int64
+	Key3 int64
+}
+
+func (k *keyLoaderTest) Load(pl []datastore.Property) error {
+	return datastore.LoadStruct(k, pl)
+}
+
+func (k *keyLoaderTest) Save() ([]datastore.Property, error) {
+	return datastore.SaveStruct(k)
+}
+
+func (k *keyLoaderTest) LoadKey(key *datastore.Key) error {
+	if key == nil {
+		return fmt.Errorf("got nil key!")
+	}
+
+	k.Key3 = key.ID * 3
+
+	return nil
+}
+
+var (
+	_ datastore.KeyLoader = (*keyLoaderTest)(nil)
+)
+
+func GetMultiKeyLoaderTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher, t)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		keys := []*datastore.Key{}
+		entities := []keyLoaderTest{}
+
+		for i := 1; i < 3; i++ {
+			keys = append(keys, datastore.IDKey("GetMultiKeyLoaderTest", int64(i), nil))
+
+			entities = append(entities, keyLoaderTest{I: int64(i)})
+		}
+
+		if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		// Update entities to reflect KeyLoader process
+		for i := range entities {
+			entities[i].Key3 = keys[i].ID * 3
+		}
+
+		// Prime the cache.
+		uncachedEntities := make([]keyLoaderTest, len(keys))
+		if err := ndsClient.GetMulti(c, keys, uncachedEntities); err != nil {
+			t.Fatal(err)
+		}
+
+		for i, e := range entities {
+			if !reflect.DeepEqual(e, uncachedEntities[i]) {
+				t.Fatal("uncachedEntities not equal", e, uncachedEntities[i])
+			}
+		}
+
+		// Use cache.
+		cachedEntities := make([]keyLoaderTest, len(keys))
+		if err := ndsClient.GetMulti(c, keys, cachedEntities); err != nil {
+			t.Fatal(err)
+		}
+
+		for i, e := range entities {
+			if !reflect.DeepEqual(e, cachedEntities[i]) {
+				t.Fatal("cachedEntities not equal", e, cachedEntities[i])
+			}
+		}
+
+		// We know the datastore supports property load saver but we need to make
+		// sure that the cache does by ensuring the cacher does not error when we
+		// change to fetching with structs.
+		// Do this by making sure the datastore is not called on this following
+		// GetMulti as the cache should have worked.
+		nds.SetDatastoreGetMultiHook(func(c context.Context,
+			keys []*datastore.Key, vals interface{}) error {
+			if len(keys) != 0 {
+				return errors.New("should not be called")
+			}
+			return nil
+		})
+		defer nds.SetDatastoreGetMultiHook(nil)
+
+		tes := make([]keyLoaderTest, len(entities))
 		if err := ndsClient.GetMulti(c, keys, tes); err != nil {
 			t.Fatal(err)
 		}
@@ -1342,6 +1443,9 @@ func (lss *loadSaveStruct) Load(properties []datastore.Property) error {
 
 	for _, p := range properties {
 		if p.Name == "Val" {
+			if p.Value.(int64) < 0 {
+				return fmt.Errorf("negative value")
+			}
 			lss.Value = p.Value.(int64)
 		}
 	}
@@ -1357,10 +1461,14 @@ func PropertyLoadSaverTest(ctx context.Context, cacher nds.Cacher) func(t *testi
 
 		keys := []*datastore.Key{
 			datastore.IncompleteKey("PropertyLoadSaverTest", nil),
+			datastore.IncompleteKey("PropertyLoadSaverTest", nil),
 		}
 		entities := []*loadSaveStruct{
 			&loadSaveStruct{
 				Value: 23,
+			},
+			&loadSaveStruct{
+				Value: -1,
 			},
 		}
 		keys, err = ndsClient.PutMulti(ctx, keys, entities)
@@ -1369,11 +1477,46 @@ func PropertyLoadSaverTest(ctx context.Context, cacher nds.Cacher) func(t *testi
 		}
 
 		entities = make([]*loadSaveStruct, 1)
-		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
+		if err := ndsClient.GetMulti(ctx, keys[:1], entities); err != nil {
 			t.Fatal(err)
 		}
 
 		if entities[0].Value != 23 {
+			t.Fatal("expected another value")
+		}
+
+		if err := ndsClient.GetMulti(ctx, keys[1:], entities); err == nil {
+			t.Fatal("expected error")
+		}
+	}
+}
+
+func KeyLoaderTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(ctx, cacher, t)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		keys := []*datastore.Key{
+			datastore.IncompleteKey("KeyLoaderTest", nil),
+		}
+		entities := []*keyLoaderTest{
+			&keyLoaderTest{
+				I: 23,
+			},
+		}
+		keys, err = ndsClient.PutMulti(ctx, keys, entities)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entities = make([]*keyLoaderTest, 1)
+		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		if entities[0].I != 23 || entities[0].Key3 != keys[0].ID*3 {
 			t.Fatal("expected another value")
 		}
 	}
@@ -1444,6 +1587,41 @@ func GetMultiFieldMismatchTest(c context.Context, cacher nds.Cacher) func(t *tes
 			if ndsResponse[i].IntVal != dsResponse[i].IntVal {
 				t.Fatalf("IntVals are not equal %d %d", ndsResponse[i].IntVal, dsResponse[i].IntVal)
 			}
+		}
+	}
+}
+
+func GetMultiExpiredContextTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(ctx, cacher, t)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cctx, cancel := context.WithCancel(ctx)
+		nds.SetDatastoreGetMultiHook(func(c context.Context,
+			keys []*datastore.Key, vals interface{}) error {
+			cancel()
+			return nil
+		})
+		defer nds.SetDatastoreGetMultiHook(nil)
+
+		type testEntity struct {
+			IntVal int64
+		}
+
+		keys := []*datastore.Key{
+			datastore.IDKey("GetMultiErrTest", 23, nil),
+		}
+
+		if _, err := ndsClient.Put(ctx, keys[0], &testEntity{1}); err != nil {
+			t.Fatalf("got err %v", err)
+		}
+
+		entities := make([]testEntity, 1)
+		if err := ndsClient.GetMulti(cctx, keys, entities); err == nil {
+			t.Errorf("expected non-nil error")
+		} else if !strings.Contains(err.Error(), cctx.Err().Error()) {
+			t.Errorf("expected err `%v` to contain `%v`", cctx.Err(), err)
 		}
 	}
 }

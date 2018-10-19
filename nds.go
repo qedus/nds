@@ -92,7 +92,7 @@ func checkValueType(valType reflect.Type) valueType {
 
 func checkKeysValues(keys []*datastore.Key, values reflect.Value) error {
 	if values.Kind() != reflect.Slice {
-		return errors.New("nds: valus is not a slice")
+		return errors.New("nds: values is not a slice")
 	}
 
 	if len(keys) != values.Len() {
@@ -154,11 +154,14 @@ func setValue(val reflect.Value, pl datastore.PropertyList, key *datastore.Key) 
 	}
 
 	if pls, ok := val.Interface().(datastore.PropertyLoadSaver); ok {
-		return pls.Load(pl)
-	}
-
-	if pls, ok := val.Interface().(datastore.KeyLoader); ok {
-		return pls.LoadKey(key)
+		err := pls.Load(pl)
+		if err != nil {
+			return err
+		}
+		if e, ok := val.Interface().(datastore.KeyLoader); ok {
+			err = e.LoadKey(key)
+		}
+		return err
 	}
 
 	return datastore.LoadStruct(val.Interface(), pl)
