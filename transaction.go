@@ -15,6 +15,18 @@ type Transaction struct {
 	lockCacheItems []*Item
 }
 
+func (t *Transaction) lockKey(key *datastore.Key) {
+	t.lockKeys([]*datastore.Key{key})
+}
+
+func (t *Transaction) lockKeys(keys []*datastore.Key) {
+	_, lockCacheItems := getCacheLocks(keys)
+	t.Lock()
+	t.lockCacheItems = append(t.lockCacheItems,
+		lockCacheItems...)
+	t.Unlock()
+}
+
 // NewTransaction will start a new datastore.Trnsaction wrapped by nds to properly update the cache
 func (c *Client) NewTransaction(ctx context.Context, opts ...datastore.TransactionOption) (t *Transaction, err error) {
 	tx, err := c.ds.NewTransaction(ctx, opts...)
@@ -26,11 +38,7 @@ func (c *Client) NewTransaction(ctx context.Context, opts ...datastore.Transacti
 }
 
 func (t *Transaction) Get(key *datastore.Key, dst interface{}) error {
-	err := t.GetMulti([]*datastore.Key{key}, []interface{}{dst})
-	if me, ok := err.(datastore.MultiError); ok {
-		return me[0]
-	}
-	return err
+	return t.tx.Get(key, dst)
 }
 
 // GetMulti is a batch version of Get. It bypasses the cache during transactions.
@@ -40,43 +48,24 @@ func (t *Transaction) GetMulti(keys []*datastore.Key, dst interface{}) error {
 }
 
 func (t *Transaction) Put(key *datastore.Key, src interface{}) (*datastore.PendingKey, error) {
-	h, err := t.PutMulti([]*datastore.Key{key}, []interface{}{src})
-	if err != nil {
-		if me, ok := err.(datastore.MultiError); ok {
-			return nil, me[0]
-		}
-		return nil, err
-	}
-	return h[0], nil
+	t.lockKey(key)
+	return t.tx.Put(key, src)
 }
 
 // PutMulti in a batch version of Put. It queues up all keys provided to be locked in the cache.
 func (t *Transaction) PutMulti(keys []*datastore.Key, src interface{}) (ret []*datastore.PendingKey, err error) {
-	_, lockCacheItems := getCacheLocks(keys)
-	t.Lock()
-	t.lockCacheItems = append(t.lockCacheItems,
-		lockCacheItems...)
-	t.Unlock()
-
+	t.lockKeys(keys)
 	return t.tx.PutMulti(keys, src)
 }
 
 func (t *Transaction) Delete(key *datastore.Key) error {
-	err := t.DeleteMulti([]*datastore.Key{key})
-	if me, ok := err.(datastore.MultiError); ok {
-		return me[0]
-	}
-	return err
+	t.lockKey(key)
+	return t.tx.Delete(key)
 }
 
 // DeleteMulti is a batch version of Delete. It queues up all keys provided to be locked in the cache.
 func (t *Transaction) DeleteMulti(keys []*datastore.Key) (err error) {
-	_, lockCacheItems := getCacheLocks(keys)
-	t.Lock()
-	t.lockCacheItems = append(t.lockCacheItems,
-		lockCacheItems...)
-	t.Unlock()
-
+	t.lockKeys(keys)
 	return t.tx.DeleteMulti(keys)
 }
 
@@ -90,6 +79,9 @@ func (t *Transaction) Commit() (*datastore.Commit, error) {
 
 // Rollback is just a passthrough to the underlying datastore.Transaction.
 func (t *Transaction) Rollback() (err error) {
+	// tx.Unlock() is not called as the tx context should never be called
+	// again so we rather block than allow people to misuse the context.
+	t.Lock()
 	return t.tx.Rollback()
 }
 
@@ -106,11 +98,7 @@ func (t *Transaction) Mutate(muts ...*Mutation) ([]*datastore.PendingKey, error)
 		mutations[i] = mut.mut
 		keys[i] = mut.k
 	}
-	_, lockCacheItems := getCacheLocks(keys)
-	t.Lock()
-	t.lockCacheItems = append(t.lockCacheItems,
-		lockCacheItems...)
-	t.Unlock()
+	t.lockKeys(keys)
 	return t.tx.Mutate(mutations...)
 }
 
@@ -132,7 +120,7 @@ func (c *Client) RunInTransaction(ctx context.Context, f func(tx *Transaction) e
 // commitCache will commit the transaction changes to the cache
 func (t *Transaction) commitCache() error {
 	// tx.Unlock() is not called as the tx context should never be called
-	//again so we rather block than allow people to misuse the context.
+	// again so we rather block than allow people to misuse the context.
 	t.Lock()
 	cacheCtx, err := t.c.cacher.NewContext(t.ctx)
 	if err != nil {
