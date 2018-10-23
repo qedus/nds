@@ -40,3 +40,7 @@ func SetDatastorePutMultiHook(f func() error) {
 func SetDatastoreGetMultiHook(f func(c context.Context, keys []*datastore.Key, vals interface{}) error) {
 	getMultiHook = f
 }
+
+func SetDatastoreMutateHook(f func() error) {
+	mutateHook = f
+}

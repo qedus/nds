@@ -7,6 +7,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// This exists purely for testing
+	mutateHook func() error
+)
+
 type mutationType byte
 
 const (
@@ -94,6 +99,12 @@ func (c *Client) Mutate(ctx context.Context, muts ...*Mutation) ([]*datastore.Ke
 	if err := c.cacher.SetMulti(cacheCtx,
 		lockCacheItems); err != nil {
 		return nil, err
+	}
+
+	if mutateHook != nil {
+		if err := mutateHook(); err != nil {
+			return nil, err
+		}
 	}
 
 	return c.ds.Mutate(ctx, mutations...)

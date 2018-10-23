@@ -195,21 +195,28 @@ func groupErrors(errs []error, total, limit int) error {
 	return groupedErrs
 }
 
+// getCacheLocks will create cache Items locks for the given datastore keys.
+// It also removes duplicate entries.
 func getCacheLocks(keys []*datastore.Key) ([]string, []*Item) {
 	lockCacheKeys := make([]string, 0, len(keys))
 	lockCacheItems := make([]*Item, 0, len(keys))
+	set := make(map[string]interface{})
 	for _, key := range keys {
 		// Worst case scenario is that we lock the entity for cacheLockTime.
 		// datastore.Delete will raise the appropriate error.
 		if key != nil && !key.Incomplete() {
-			item := &Item{
-				Key:        createCacheKey(key),
-				Flags:      lockItem,
-				Value:      itemLock(),
-				Expiration: cacheLockTime,
+			cacheKey := createCacheKey(key)
+			if _, found := set[cacheKey]; !found {
+				item := &Item{
+					Key:        cacheKey,
+					Flags:      lockItem,
+					Value:      itemLock(),
+					Expiration: cacheLockTime,
+				}
+				lockCacheItems = append(lockCacheItems, item)
+				lockCacheKeys = append(lockCacheKeys, item.Key)
+				set[cacheKey] = nil
 			}
-			lockCacheItems = append(lockCacheItems, item)
-			lockCacheKeys = append(lockCacheKeys, item.Key)
 		}
 	}
 	return lockCacheKeys, lockCacheItems

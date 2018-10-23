@@ -65,6 +65,10 @@ func TestMemcacheNamespace(t *testing.T) {
 		t.Fatal("expected namespace error")
 	}
 
+	if _, err := ndsClient.Mutate(c, nds.NewUpsert(key, &testEntity{})); err == nil {
+		t.Fatal("expected namespace error")
+	}
+
 	if _, err := ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
 		log.Println("returnin nil")
 		return nil
