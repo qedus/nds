@@ -93,7 +93,7 @@ func PutMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 		_, err = ndsClient.PutMulti(c, keys, entities)
 		me, ok := err.(datastore.MultiError)
 		if !ok {
-			t.Fatal("expected appengine.MultiError")
+			t.Fatal("expected datastore.MultiError")
 		}
 		for i, e := range me {
 			if e != expectedErrs[i] {

@@ -165,7 +165,7 @@ func CacherImplementationTest(ctx context.Context, cacher nds.Cacher) func(t *te
 							}
 						}
 					}
-					foundSet := make(map[string][]byte)
+					foundSet := make(map[string]interface{})
 					result, err := cacher.GetMulti(tt.args.c, keys)
 					if err != tt.getWant {
 						t.Errorf("wanted err %v, got %v", tt.getWant, err)

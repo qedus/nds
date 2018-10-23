@@ -34,6 +34,7 @@ func TestGetSuite(t *testing.T) {
 			t.Run("TestGetMultiLockReturnEntity", GetMultiLockReturnEntityTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiLockReturnUnknown", GetMultiLockReturnUnknownTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiLockReturnMiss", GetMultiLockReturnMissTest(item.ctx, item.cacher))
+			t.Run("TestGetMultiLockDatastoreUnknownError", GetMultiLockDatastoreUnknownErrorTest(item.ctx, item.cacher))
 			t.Run("TestGetNamespacedKey", GetNamespacedKeyTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiPaths", GetMultiPathsTest(item.ctx, item.cacher))
 			t.Run("TestPropertyLoadSaver", PropertyLoadSaverTest(item.ctx, item.cacher))
@@ -897,6 +898,72 @@ func GetMultiLockReturnMissTest(c context.Context, cacher nds.Cacher) func(t *te
 		for i := 0; i < len(keys); i++ {
 			if entities[i].IntVal != response[i].IntVal {
 				t.Fatal("IntVal not equal")
+			}
+		}
+	}
+}
+
+func GetMultiLockDatastoreUnknownErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		testCacher := &mockCacher{
+			cacher: cacher,
+		}
+		ndsClient, err := NewClient(c, testCacher, t)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		type testEntity struct {
+			IntVal int64
+		}
+
+		keys := []*datastore.Key{}
+		entities := []testEntity{}
+		for i := int64(1); i < 3; i++ {
+			keys = append(keys, datastore.IDKey("GetMultiLockReturnErrorTest", i, nil))
+			entities = append(entities, testEntity{i})
+		}
+
+		if _, err = ndsClient.PutMulti(c, keys, entities); err != nil {
+			t.Fatal(err)
+		}
+
+		invalidKey := datastore.NameKey("GetMultiLockReturnErrorTest", "invalid", nil)
+		invalidKey.ID = 9000 // Key should name a Name or ID, but not both
+		keys = append(keys, invalidKey)
+		invalidKeyCalled := false
+		invalidCacheKey := nds.CreateCacheKey(invalidKey)
+		testCacher.compareAndSwapHook = func(c context.Context,
+			items []*nds.Item) error {
+			// shouldn't find invalid last item here
+			for _, item := range items {
+				if item.Key == invalidCacheKey {
+					invalidKeyCalled = true
+					return errors.New("should not have called this")
+				}
+			}
+			return cacher.CompareAndSwapMulti(c, items)
+		}
+
+		response := make([]testEntity, len(keys))
+		if err = ndsClient.GetMulti(c, keys, response); err == nil {
+			t.Error("expected non-nil err")
+		}
+
+		if invalidKeyCalled {
+			t.Fatal("Invalid key was not skipped")
+		}
+
+		if me, ok := err.(datastore.MultiError); !ok {
+			t.Errorf("expected MultiError, got %v", err)
+		} else {
+			for i := 0; i < len(keys)-1; i++ {
+				if me[i] != nil {
+					t.Errorf("expected err=nil, got %v", me[i])
+				}
+			}
+			if got := me[len(keys)-1]; got != datastore.ErrInvalidKey {
+				t.Errorf("expected ErrInvalidKey, got %d", got)
 			}
 		}
 	}
