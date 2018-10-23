@@ -12,7 +12,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
-	"github.com/qedus/nds"
+	"github.com/qedus/nds/v2"
 )
 
 // NewCacher will intiialize a new in-memory cache

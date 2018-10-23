@@ -8,7 +8,7 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/qedus/nds"
+	"github.com/qedus/nds/v2"
 )
 
 func TestTransactionSuite(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	redigo "github.com/gomodule/redigo/redis"
-	"github.com/qedus/nds"
+	"github.com/qedus/nds/v2"
 
-	"github.com/qedus/nds/cachers/redis"
+	"github.com/qedus/nds/v2/cachers/redis"
 )
 
 var (

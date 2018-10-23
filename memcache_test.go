@@ -8,8 +8,8 @@ import (
 	"cloud.google.com/go/datastore"
 	"google.golang.org/appengine/aetest"
 
-	"github.com/qedus/nds"
-	"github.com/qedus/nds/cachers/memcache"
+	"github.com/qedus/nds/v2"
+	"github.com/qedus/nds/v2/cachers/memcache"
 )
 
 func init() {

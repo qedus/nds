@@ -11,8 +11,8 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/qedus/nds"
-	"github.com/qedus/nds/cachers/memory"
+	"github.com/qedus/nds/v2"
+	"github.com/qedus/nds/v2/cachers/memory"
 )
 
 func TestClient_onError(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qedus/nds"
+	"github.com/qedus/nds/v2"
 )
 
 func TestCachersImplementations(t *testing.T) {
