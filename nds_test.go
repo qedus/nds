@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/datastore"
-	"github.com/gomodule/redigo/redis"
+	"github.com/opencensus-integrations/redigo/redis"
 
 	"github.com/qedus/nds/v2"
 	"github.com/qedus/nds/v2/cachers/memory"

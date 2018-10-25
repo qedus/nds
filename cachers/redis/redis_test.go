@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	redigo "github.com/gomodule/redigo/redis"
+	redigo "github.com/opencensus-integrations/redigo/redis"
 	"github.com/qedus/nds/v2"
 
 	"github.com/qedus/nds/v2/cachers/redis"
