@@ -11,6 +11,8 @@ import (
 
 	"cloud.google.com/go/datastore"
 	"github.com/pkg/errors"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/trace"
 )
 
 // getMultiLimit is the Google Cloud Datastore limit for the maximum number
@@ -146,6 +148,9 @@ type cacheItem struct {
 // including http://goo.gl/3ByVlA.
 func (c *Client) getMulti(ctx context.Context,
 	keys []*datastore.Key, vals reflect.Value) error {
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds/datastore.Get")
+	defer span.End()
 
 	cacheItems := make([]cacheItem, len(keys))
 	for i, key := range keys {
@@ -160,7 +165,10 @@ func (c *Client) getMulti(ctx context.Context,
 		return err
 	}
 
-	c.loadCache(cacheCtx, cacheItems)
+	cacheHits := c.loadCache(cacheCtx, cacheItems)
+	cacheMisses := len(cacheItems) - cacheHits
+	stats.Record(ctx, mCacheHit.M(int64(cacheHits)))
+	stats.Record(ctx, mCacheMiss.M(int64(cacheMisses)))
 
 	c.lockCache(cacheCtx, cacheItems)
 
@@ -184,7 +192,8 @@ func (c *Client) getMulti(ctx context.Context,
 	return me
 }
 
-func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) {
+// loadCache will return the # of cache hits
+func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) (cacheHits int) {
 
 	cacheKeys := make([]string, len(cacheItems))
 	for i, cacheItem := range cacheItems {
@@ -208,6 +217,7 @@ func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) {
 			case noneItem:
 				cacheItems[i].state = done
 				cacheItems[i].err = datastore.ErrNoSuchEntity
+				cacheHits++
 			case entityItem:
 				pl := datastore.PropertyList{}
 				if err := unmarshal(item.Value, &pl); err != nil {
@@ -217,6 +227,7 @@ func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) {
 				}
 				if err := setValue(cacheItems[i].val, pl, cacheItems[i].key); err == nil {
 					cacheItems[i].state = done
+					cacheHits++
 				} else {
 					c.onError(ctx, errors.Wrapf(err, "nds:loadCache setValue"))
 					cacheItems[i].state = externalLock
@@ -227,6 +238,8 @@ func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) {
 			}
 		}
 	}
+
+	return
 }
 
 // itemLock creates a pseudorandom cache lock value that enables each call of
