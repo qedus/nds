@@ -107,7 +107,7 @@ func set(ctx context.Context, conn redis.ConnWithContext, nx bool, items []*nds.
 				me[i] = err
 			}
 		}
-		flushErr = conn.Flush()
+		flushErr = conn.FlushContext(ctx)
 		if buf.Cap() <= maxCacheSize {
 			bufPool.Put(buf)
 		}
@@ -188,7 +188,7 @@ func (b *backend) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) er
 				me[i] = nds.ErrNotStored
 			}
 		}
-		flushErr = redisConn.Flush()
+		flushErr = redisConn.FlushContext(ctx)
 		if buf.Cap() <= maxCacheSize {
 			bufPool.Put(buf)
 		}
