@@ -380,7 +380,7 @@ func TestMultiCache(t *testing.T) {
 
 	me, ok := err.(appengine.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T, %s", err, err)
+		t.Fatalf("not an appengine.MultiError: %s", err)
 	}
 
 	// Check respEntities are in order.
@@ -446,7 +446,7 @@ func TestMultiCache(t *testing.T) {
 
 	me, ok = err.(appengine.MultiError)
 	if !ok {
-		t.Fatalf("not an appengine.MultiError: %+T", me)
+		t.Fatalf("not an appengine.MultiError: %s", me)
 	}
 
 	// Check respEntities are in order.
@@ -646,7 +646,7 @@ func TestMemcacheNamespace(t *testing.T) {
 	}
 
 	// Illegal namespace chars.
-	nds.SetMemcacheNamespace("£££")
+	nds.SetMemcacheNamespace("Â£Â£Â£")
 
 	key := datastore.NewKey(c, "Entity", "", 1, nil)
 	if err := nds.Get(c, key, &testEntity{}); err == nil {
