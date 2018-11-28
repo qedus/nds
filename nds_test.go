@@ -624,7 +624,7 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		me, ok = err.(datastore.MultiError)
 		if !ok {
-			t.Fatalf("not an datastore.MultiError: %T", me)
+			t.Fatalf("not a datastore.MultiError: %s", me)
 		}
 
 		// Check respEntities are in order.
