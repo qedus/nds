@@ -77,19 +77,18 @@ func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	}
 }
 
-// Test will panic, see https://github.com/GoogleCloudPlatform/google-cloud-go/issues/1175
-// func DeleteNilKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
-// 	return func(t *testing.T) {
-// 		ndsClient, err := NewClient(c, cacher, t)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
+func DeleteNilKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(c, cacher, t)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-// 		if err := ndsClient.Delete(c, nil); err != datastore.ErrInvalidKey {
-// 			t.Fatal("expected nil key error")
-// 		}
-// 	}
-// }
+		if err := ndsClient.Delete(c, nil); err != datastore.ErrInvalidKey {
+			t.Fatal("expected nil key error")
+		}
+	}
+}
 
 func DeleteIncompleteKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
