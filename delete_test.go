@@ -24,9 +24,9 @@ func TestDeleteSuite(t *testing.T) {
 	}
 }
 
-func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func DeleteMultiTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,21 +44,21 @@ func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 				entities[i] = TestEntity{i}
 			}
 
-			if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+			if _, err := ndsClient.PutMulti(ctx, keys, entities); err != nil {
 				t.Fatal(err)
 			}
 
 			// Prime cache.
 			entities = make([]TestEntity, count)
-			if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+			if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 				t.Fatal(err)
 			}
 
-			if err = ndsClient.DeleteMulti(c, keys); err != nil {
+			if err = ndsClient.DeleteMulti(ctx, keys); err != nil {
 				t.Fatal(err)
 			}
 
-			err = ndsClient.GetMulti(c, keys, make([]TestEntity, count))
+			err = ndsClient.GetMulti(ctx, keys, make([]TestEntity, count))
 			if err == nil {
 				t.Fatal("expect error")
 			}
@@ -77,40 +77,40 @@ func DeleteMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	}
 }
 
-func DeleteNilKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func DeleteNilKeyTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := ndsClient.Delete(c, nil); err != datastore.ErrInvalidKey {
+		if err := ndsClient.Delete(ctx, nil); err != datastore.ErrInvalidKey {
 			t.Fatal("expected nil key error")
 		}
 	}
 }
 
-func DeleteIncompleteKeyTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func DeleteIncompleteKeyTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		key := datastore.IncompleteKey("Entity", nil)
 
-		if err := ndsClient.Delete(c, key); err == nil {
+		if err := ndsClient.Delete(ctx, key); err == nil {
 			t.Fatal("expected invalid key error")
 		}
 	}
 }
 
-func DeleteCacheFailTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func DeleteCacheFailTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +124,7 @@ func DeleteCacheFailTest(c context.Context, cacher nds.Cacher) func(t *testing.T
 		entities := make([]testEntity, 1)
 		entities[0].Val = 43
 
-		if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+		if _, err := ndsClient.PutMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -132,15 +132,15 @@ func DeleteCacheFailTest(c context.Context, cacher nds.Cacher) func(t *testing.T
 			return errors.New("expected error")
 		}
 
-		if err := ndsClient.DeleteMulti(c, keys); err == nil {
+		if err := ndsClient.DeleteMulti(ctx, keys); err == nil {
 			t.Fatal("expected DeleteMulti error")
 		}
 	}
 }
 
-func DeleteInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func DeleteInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -150,22 +150,22 @@ func DeleteInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testi
 		}
 
 		key := datastore.IDKey("TestEntity", 1, nil)
-		if _, err := ndsClient.Put(c, key, &testEntity{2}); err != nil {
+		if _, err := ndsClient.Put(ctx, key, &testEntity{2}); err != nil {
 			t.Fatal(err)
 		}
 
 		// Prime cache.
-		if err := ndsClient.Get(c, key, &testEntity{}); err != nil {
+		if err := ndsClient.Get(ctx, key, &testEntity{}); err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		if _, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			return tx.DeleteMulti([]*datastore.Key{key})
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		if err = ndsClient.Get(c, key, &testEntity{}); err == nil {
+		if err = ndsClient.Get(ctx, key, &testEntity{}); err == nil {
 			t.Fatal("expected no entity")
 		} else if err != datastore.ErrNoSuchEntity {
 			t.Fatal(err)

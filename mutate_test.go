@@ -26,12 +26,12 @@ func TestMutate(t *testing.T) {
 	}
 }
 
-func MutateInsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateInsertTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,12 +45,12 @@ func MutateInsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 		t.Run("Success", func(t *testing.T) {
 			// Basic Insert
 			entity := &testEntity{64}
-			keys, err = ndsClient.Mutate(c, nds.NewInsert(datastore.IncompleteKey("MutateInsertTests", nil), entity))
+			keys, err = ndsClient.Mutate(ctx, nds.NewInsert(datastore.IncompleteKey("MutateInsertTests", nil), entity))
 			if err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 			var dest testEntity
-			if err = ndsClient.Get(c, keys[0], &dest); err != nil {
+			if err = ndsClient.Get(ctx, keys[0], &dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if dest.Value != entity.Value {
@@ -65,12 +65,12 @@ func MutateInsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 		t.Run("Failure", func(t *testing.T) {
 			// Insert duplicate failure
 			entity := &testEntity{64}
-			_, err = ndsClient.Mutate(c, nds.NewInsert(keys[0], &testEntity{65}))
+			_, err = ndsClient.Mutate(ctx, nds.NewInsert(keys[0], &testEntity{65}))
 			if err == nil {
 				t.Fatal("expected err != nil, got nil")
 			}
 			var dest testEntity
-			if err = ndsClient.Get(c, keys[0], &dest); err != nil {
+			if err = ndsClient.Get(ctx, keys[0], &dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if dest.Value != entity.Value {
@@ -85,12 +85,12 @@ func MutateInsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				nds.NewInsert(datastore.IncompleteKey("MutateInsertTests", nil), entity),
 				nds.NewInsert(datastore.IncompleteKey("MutateInsertTests", nil), entity),
 			}
-			if keys, err = ndsClient.Mutate(c, inserts...); err != nil {
+			if keys, err = ndsClient.Mutate(ctx, inserts...); err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 
 			dest := make([]testEntity, 2)
-			if err = ndsClient.GetMulti(c, keys, dest); err != nil {
+			if err = ndsClient.GetMulti(ctx, keys, dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if len(dest) != 2 || dest[0].Value != entity.Value || dest[1].Value != entity.Value {
@@ -98,16 +98,16 @@ func MutateInsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 			}
 		})
 
-		ndsClient.DeleteMulti(c, keys) // Cleanup
+		ndsClient.DeleteMulti(ctx, keys) // Cleanup
 	}
 }
 
-func MutateUpdateTests(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateUpdateTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,34 +121,34 @@ func MutateUpdateTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 			datastore.NameKey("MutateUpdateTests", "test2", nil),
 		}
 
-		defer ndsClient.DeleteMulti(c, keys) // Cleanup
+		defer ndsClient.DeleteMulti(ctx, keys) // Cleanup
 
 		t.Run("Failure", func(t *testing.T) {
 			// Update non-existent key failure
 			entity := &testEntity{64}
-			_, err = ndsClient.Mutate(c, nds.NewUpdate(keys[0], entity))
+			_, err = ndsClient.Mutate(ctx, nds.NewUpdate(keys[0], entity))
 			if err == nil {
 				t.Fatal("expected err != nil, got nil")
 			}
 			var dest testEntity
-			if err = ndsClient.Get(c, keys[0], &dest); err == nil {
+			if err = ndsClient.Get(ctx, keys[0], &dest); err == nil {
 				t.Fatalf("unexpectedly got entity: %v", err)
 			}
 		})
 
-		if _, err = ndsClient.PutMulti(c, keys, []testEntity{testEntity{123}, testEntity{123}}); err != nil {
+		if _, err = ndsClient.PutMulti(ctx, keys, []testEntity{testEntity{123}, testEntity{123}}); err != nil {
 			t.Fatalf("could not put into datastore: %v", err)
 		}
 
 		t.Run("Success", func(t *testing.T) {
 			// Basic Updates
 			entity := &testEntity{64}
-			_, err = ndsClient.Mutate(c, nds.NewUpdate(keys[0], entity))
+			_, err = ndsClient.Mutate(ctx, nds.NewUpdate(keys[0], entity))
 			if err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 			var dest testEntity
-			if err = ndsClient.Get(c, keys[0], &dest); err != nil {
+			if err = ndsClient.Get(ctx, keys[0], &dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if dest.Value != entity.Value {
@@ -163,12 +163,12 @@ func MutateUpdateTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				nds.NewUpdate(keys[0], entity),
 				nds.NewUpdate(keys[1], entity),
 			}
-			if _, err = ndsClient.Mutate(c, inserts...); err != nil {
+			if _, err = ndsClient.Mutate(ctx, inserts...); err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 
 			dest := make([]testEntity, 2)
-			if err = ndsClient.GetMulti(c, keys, dest); err != nil {
+			if err = ndsClient.GetMulti(ctx, keys, dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if len(dest) != 2 || dest[0].Value != entity.Value || dest[1].Value != entity.Value {
@@ -178,12 +178,12 @@ func MutateUpdateTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 	}
 }
 
-func MutateUpsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateUpsertTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -197,12 +197,12 @@ func MutateUpsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 		t.Run("Success", func(t *testing.T) {
 			// Basic Upsert
 			entity := &testEntity{64}
-			keys, err = ndsClient.Mutate(c, nds.NewUpsert(datastore.IncompleteKey("MutateUpsertTests", nil), entity))
+			keys, err = ndsClient.Mutate(ctx, nds.NewUpsert(datastore.IncompleteKey("MutateUpsertTests", nil), entity))
 			if err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 			var dest testEntity
-			if err = ndsClient.Get(c, keys[0], &dest); err != nil {
+			if err = ndsClient.Get(ctx, keys[0], &dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if dest.Value != entity.Value {
@@ -221,12 +221,12 @@ func MutateUpsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				nds.NewUpsert(keys[0], entity),
 				nds.NewUpsert(datastore.IncompleteKey("MutateUpsertTests", nil), entity),
 			}
-			if keys, err = ndsClient.Mutate(c, upserts...); err != nil {
+			if keys, err = ndsClient.Mutate(ctx, upserts...); err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 
 			dest := make([]testEntity, 2)
-			if err = ndsClient.GetMulti(c, keys, dest); err != nil {
+			if err = ndsClient.GetMulti(ctx, keys, dest); err != nil {
 				t.Fatalf("could not get entity: %v", err)
 			}
 			if len(dest) != 2 || dest[0].Value != entity.Value || dest[1].Value != entity.Value {
@@ -234,16 +234,16 @@ func MutateUpsertTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 			}
 		})
 
-		ndsClient.DeleteMulti(c, keys) // Cleanup
+		ndsClient.DeleteMulti(ctx, keys) // Cleanup
 	}
 }
 
-func MutateDeleteTests(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateDeleteTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -258,18 +258,18 @@ func MutateDeleteTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 			datastore.NameKey("MutateDeleteTests", "test3", nil),
 		}
 
-		if _, err = ndsClient.PutMulti(c, keys, []testEntity{testEntity{123}, testEntity{123}, testEntity{123}}); err != nil {
+		if _, err = ndsClient.PutMulti(ctx, keys, []testEntity{testEntity{123}, testEntity{123}, testEntity{123}}); err != nil {
 			t.Fatalf("could not put into datastore: %v", err)
 		}
 
 		t.Run("Success", func(t *testing.T) {
 			// Basic Delete
-			_, err = ndsClient.Mutate(c, nds.NewDelete(keys[0]))
+			_, err = ndsClient.Mutate(ctx, nds.NewDelete(keys[0]))
 			if err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 			var dest testEntity
-			if err = ndsClient.Get(c, keys[0], &dest); err == nil {
+			if err = ndsClient.Get(ctx, keys[0], &dest); err == nil {
 				t.Fatalf("unexpectedly go entity: %v", dest)
 			}
 		})
@@ -280,34 +280,34 @@ func MutateDeleteTests(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 				nds.NewDelete(keys[1]),
 				nds.NewDelete(keys[2]),
 			}
-			if _, err = ndsClient.Mutate(c, deletes...); err != nil {
+			if _, err = ndsClient.Mutate(ctx, deletes...); err != nil {
 				t.Fatalf("expected err=nil, got %v", err)
 			}
 
 			dest := make([]testEntity, 2)
-			if err = ndsClient.GetMulti(c, keys[1:], dest); err == nil {
+			if err = ndsClient.GetMulti(ctx, keys[1:], dest); err == nil {
 				t.Fatalf("unexpectedly got entities: %v", dest)
 			}
 		})
 	}
 }
 
-func MutateZeroArgTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateZeroArgTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = ndsClient.Mutate(c); err != nil {
+		if _, err = ndsClient.Mutate(ctx); err != nil {
 			t.Errorf("expected err = nil, got %v", err)
 		}
 	}
 }
 
-func MutateLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateLockFailureTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		datastoreCalled := false
 
@@ -323,7 +323,7 @@ func MutateLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testing
 			return nil
 		})
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,7 +335,7 @@ func MutateLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testing
 		key := datastore.IDKey("MutateLockFailureTest", 1, nil)
 		val := testEntity{42}
 
-		if _, err := ndsClient.Mutate(c, nds.NewUpsert(key, &val)); err == nil {
+		if _, err := ndsClient.Mutate(ctx, nds.NewUpsert(key, &val)); err == nil {
 			t.Fatal("expected nds.PutMulti error")
 		}
 		if datastoreCalled {
@@ -345,7 +345,7 @@ func MutateLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testing
 }
 
 // Make sure Mutate still works if we have a cache unlock failure.
-func MutateUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateUnlockCacheSuccessTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
@@ -354,7 +354,7 @@ func MutateUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t *
 			},
 		}
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -366,13 +366,13 @@ func MutateUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t *
 		key := datastore.IDKey("MutateUnlockCacheSuccessTest", 1, nil)
 		val := testEntity{42}
 
-		if _, err := ndsClient.Mutate(c, nds.NewUpsert(key, &val)); err != nil {
+		if _, err := ndsClient.Mutate(ctx, nds.NewUpsert(key, &val)); err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
-func MutateDatastoreErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateDatastoreErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		expectedErr := errors.New("expected error")
 
@@ -385,7 +385,7 @@ func MutateDatastoreErrorTest(c context.Context, cacher nds.Cacher) func(t *test
 		})
 		defer nds.SetDatastoreMutateHook(nil)
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -397,21 +397,21 @@ func MutateDatastoreErrorTest(c context.Context, cacher nds.Cacher) func(t *test
 		key := datastore.IDKey("MutateDatastoreErrorTest", 1, nil)
 		val := testEntity{42}
 
-		if _, err := ndsClient.Mutate(c, nds.NewUpsert(key, &val)); err != expectedErr {
+		if _, err := ndsClient.Mutate(ctx, nds.NewUpsert(key, &val)); err != expectedErr {
 			t.Errorf("expected error=%v, got %v", expectedErr, err)
 		}
 	}
 }
 
-func MutateBadContextTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateBadContextTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		badctx, cancel := context.WithCancel(c)
+		badctx, cancel := context.WithCancel(ctx)
 		cancel()
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -429,13 +429,13 @@ func MutateBadContextTest(c context.Context, cacher nds.Cacher) func(t *testing.
 	}
 }
 
-func MutateTrackingTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MutateTrackingTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	// Make sure we properly track cache lock items and releases, in the proper order
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -498,7 +498,7 @@ func MutateTrackingTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 		})
 		defer nds.SetDatastoreMutateHook(nil)
 
-		_, err = ndsClient.Mutate(c,
+		_, err = ndsClient.Mutate(ctx,
 			nds.NewInsert(testKeys[0], testEntity{65}),
 			nds.NewUpsert(testKeys[1], testEntity{65}),
 			nds.NewUpdate(testKeys[2], testEntity{65}),

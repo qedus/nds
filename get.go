@@ -24,7 +24,7 @@ const getMultiLimit = 1000
 
 var (
 	// getMultiHook exists purely for testing
-	getMultiHook func(c context.Context, keys []*datastore.Key, vals interface{}) error
+	getMultiHook func(ctx context.Context, keys []*datastore.Key, vals interface{}) error
 )
 
 // GetMulti works similar to datastore.GetMulti except for two important
@@ -160,23 +160,18 @@ func (c *Client) getMulti(ctx context.Context,
 		cacheItems[i].state = miss
 	}
 
-	cacheCtx, err := c.cacher.NewContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	cacheHits := c.loadCache(cacheCtx, cacheItems)
+	cacheHits := c.loadCache(ctx, cacheItems)
 	cacheMisses := len(cacheItems) - cacheHits
 	stats.Record(ctx, mCacheHit.M(int64(cacheHits)))
 	stats.Record(ctx, mCacheMiss.M(int64(cacheMisses)))
 
-	c.lockCache(cacheCtx, cacheItems)
+	c.lockCache(ctx, cacheItems)
 
 	if err := c.loadDatastore(ctx, cacheItems, vals.Type()); err != nil {
 		return err
 	}
 
-	c.saveCache(cacheCtx, cacheItems)
+	c.saveCache(ctx, cacheItems)
 
 	me, errsNil := make(datastore.MultiError, len(cacheItems)), true
 	for i, cacheItem := range cacheItems {

@@ -1,4 +1,4 @@
-# nds
+# nds (v2 - EXPERIMENTAL)
 
 [![Build Status](https://travis-ci.org/qedus/nds.svg?branch=master)](https://travis-ci.org/qedus/nds) [![Coverage Status](https://coveralls.io/repos/github/qedus/nds/badge.svg?branch=master)](https://coveralls.io/github/qedus/nds?branch=master) [![GoDoc](https://godoc.org/github.com/qedus/nds?status.png)](https://godoc.org/github.com/qedus/nds)
 
@@ -12,12 +12,11 @@ One other benefit is that the standard `datastore.Client.GetMulti`, `datastore.C
 
 ## How To Use
 
-You can use this package in _exactly_ the same way you would use [`code.google.com/go/datastore.Client`](https://godoc.org/cloud.google.com/go/datastore#Client) for methods provided by `nds.Client`. However, it is important that you use a `nds.Client` entirely within your code. Do not mix use of those functions with the `code.google.com/go/datastore.Client` equivalents as you will be liable to get stale datastore entities from `github.com/qedus/nds`.
+You can use this package in _exactly_ the same way you would use [`code.google.com/go/datastore.Client`](https://godoc.org/cloud.google.com/go/datastore#Client) for methods provided by `nds.Client`. However,it is important that you use a `nds.Client` entirely within your code. Do not mix use of those functions with the `code.google.com/go/datastore.Client` equivalents as you will be liable to get stale datastore entities from `github.com/qedus/nds`.
 
 Ultimately all you need to do is:
 
+- import github.com/qedus/nds/v2
 - use `nds.NewClient` instead of `datastore.NewClient`, providing a cache configuration to the new client creation function.
 - replace `datastore.Transaction` -> `nds.Transaction`
 - if using `(*datastore.Query).Transaction` for queries within transactions, switch to the `(*nds.Transaction).Query` helper.
-
-Currently, Mutations are not supported but should be in the future.

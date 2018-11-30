@@ -30,7 +30,7 @@ func TestTransactionSuite(t *testing.T) {
 }
 
 // Get calls should not use the cache
-func TransactionGetTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionGetTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		wasCalled := false
 		testCacher := &mockCacher{
@@ -40,7 +40,7 @@ func TransactionGetTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 				return nil, errors.New("should not be called")
 			},
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,17 +52,17 @@ func TransactionGetTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 		entity := &testEntity{56}
 
 		key := datastore.IncompleteKey("TransactionGetTest", nil)
-		if key, err = ndsClient.Put(c, key, entity); err != nil {
+		if key, err = ndsClient.Put(ctx, key, entity); err != nil {
 			t.Fatalf("could not store entity due to error: %v", err)
 		}
 
 		t.Run("Transaction_Get", func(t *testing.T) {
-			ndsClient, err := NewClient(c, testCacher, t)
+			ndsClient, err := NewClient(ctx, testCacher, t)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+			_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 				var txTest testEntity
 				if err := tx.Get(key, &txTest); err != nil {
 					return err
@@ -82,12 +82,12 @@ func TransactionGetTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 		})
 
 		t.Run("Transaction_GetMulti", func(t *testing.T) {
-			ndsClient, err := NewClient(c, testCacher, t)
+			ndsClient, err := NewClient(ctx, testCacher, t)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+			_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 				txTest := make([]testEntity, 1)
 				if err := tx.GetMulti([]*datastore.Key{key}, txTest); err != nil {
 					return err
@@ -108,7 +108,7 @@ func TransactionGetTest(c context.Context, cacher nds.Cacher) func(t *testing.T)
 }
 
 // If an error occured in the transaction, do NOT try and lock keys
-func RunInTransactionErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func RunInTransactionErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		wasCalled := false
 		testCacher := &mockCacher{
@@ -118,7 +118,7 @@ func RunInTransactionErrorTest(c context.Context, cacher nds.Cacher) func(t *tes
 				return errors.New("should not be called")
 			},
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func RunInTransactionErrorTest(c context.Context, cacher nds.Cacher) func(t *tes
 
 		var expectedErr = errors.New("expected")
 
-		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			if _, err := tx.Put(datastore.IncompleteKey("RunInTransactionErrorTest", nil), &testEntity{54}); err != nil {
 				return err
 			}
@@ -143,12 +143,12 @@ func RunInTransactionErrorTest(c context.Context, cacher nds.Cacher) func(t *tes
 	}
 }
 
-func TransactionTrackingTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionTrackingTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,7 +174,7 @@ func TransactionTrackingTest(c context.Context, cacher nds.Cacher) func(t *testi
 			if key.Name == "insertMutation" {
 				continue
 			}
-			if _, err = ndsClient.Put(c, key, &testEntity{i}); err != nil {
+			if _, err = ndsClient.Put(ctx, key, &testEntity{i}); err != nil {
 				t.Fatalf("could not put entity: %v", err)
 			}
 		}
@@ -193,7 +193,7 @@ func TransactionTrackingTest(c context.Context, cacher nds.Cacher) func(t *testi
 			return cacher.SetMulti(ctx, items)
 		}
 		newEntity := testEntity{100}
-		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			if _, err := tx.Put(testKeys[0], &newEntity); err != nil {
 				return err
 			}
@@ -225,18 +225,18 @@ func TransactionTrackingTest(c context.Context, cacher nds.Cacher) func(t *testi
 		}
 
 		// Cleanup
-		ndsClient.DeleteMulti(c, testKeys)
+		ndsClient.DeleteMulti(ctx, testKeys)
 	}
 }
 
-func TransactionNewErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionNewErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		badctx, cancel := context.WithCancel(c)
+		badctx, cancel := context.WithCancel(ctx)
 		cancel()
 
 		_, terr := ndsClient.NewTransaction(badctx)
@@ -246,9 +246,9 @@ func TransactionNewErrorTest(c context.Context, cacher nds.Cacher) func(t *testi
 	}
 }
 
-func TransactionCommitTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionCommitTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -259,11 +259,11 @@ func TransactionCommitTest(c context.Context, cacher nds.Cacher) func(t *testing
 
 		key := datastore.IncompleteKey("TransactionCommitTest", nil)
 		entity := &testEntity{20}
-		if key, err = ndsClient.Put(c, key, entity); err != nil {
+		if key, err = ndsClient.Put(ctx, key, entity); err != nil {
 			t.Fatalf("error saving entity: %v", err)
 		}
 
-		txn, terr := ndsClient.NewTransaction(c)
+		txn, terr := ndsClient.NewTransaction(ctx)
 		if terr != nil {
 			t.Fatalf("could not start transaciton: %v", err)
 		}
@@ -278,7 +278,7 @@ func TransactionCommitTest(c context.Context, cacher nds.Cacher) func(t *testing
 		}
 
 		var dest testEntity
-		if err = ndsClient.Get(c, key, &dest); err != nil {
+		if err = ndsClient.Get(ctx, key, &dest); err != nil {
 			t.Fatalf("could not get entity: %v", err)
 		}
 
@@ -288,12 +288,12 @@ func TransactionCommitTest(c context.Context, cacher nds.Cacher) func(t *testing
 	}
 }
 
-func TransactionCommitErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionCommitErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,11 +304,11 @@ func TransactionCommitErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 
 		key := datastore.IncompleteKey("TransactionCommitErrorTest", nil)
 		entity := &testEntity{20}
-		if key, err = ndsClient.Put(c, key, entity); err != nil {
+		if key, err = ndsClient.Put(ctx, key, entity); err != nil {
 			t.Fatalf("error saving entity: %v", err)
 		}
 
-		txn, terr := ndsClient.NewTransaction(c)
+		txn, terr := ndsClient.NewTransaction(ctx)
 		if terr != nil {
 			t.Fatalf("could not start transaciton: %v", err)
 		}
@@ -327,7 +327,7 @@ func TransactionCommitErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 		}
 
 		var dest testEntity
-		if err = ndsClient.Get(c, key, &dest); err != nil {
+		if err = ndsClient.Get(ctx, key, &dest); err != nil {
 			t.Fatalf("could not get entity: %v", err)
 		}
 
@@ -337,9 +337,9 @@ func TransactionCommitErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 	}
 }
 
-func TransactionRollbackTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionRollbackTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -350,11 +350,11 @@ func TransactionRollbackTest(c context.Context, cacher nds.Cacher) func(t *testi
 
 		key := datastore.IncompleteKey("TransactionRollbackTest", nil)
 		entity := &testEntity{20}
-		if key, err = ndsClient.Put(c, key, entity); err != nil {
+		if key, err = ndsClient.Put(ctx, key, entity); err != nil {
 			t.Fatalf("error saving entity: %v", err)
 		}
 
-		txn, terr := ndsClient.NewTransaction(c)
+		txn, terr := ndsClient.NewTransaction(ctx)
 		if terr != nil {
 			t.Fatalf("could not start transaciton: %v", err)
 		}
@@ -369,7 +369,7 @@ func TransactionRollbackTest(c context.Context, cacher nds.Cacher) func(t *testi
 		}
 
 		var dest testEntity
-		if err = ndsClient.Get(c, key, &dest); err != nil {
+		if err = ndsClient.Get(ctx, key, &dest); err != nil {
 			t.Fatalf("could not get entity: %v", err)
 		}
 
@@ -379,15 +379,15 @@ func TransactionRollbackTest(c context.Context, cacher nds.Cacher) func(t *testi
 	}
 }
 
-func TransactionQueryHelperTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionQueryHelperTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	// TODO: With eventual migration to Firestore Datastore Mode - this test becomes obsolete
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		dsclient, err := datastore.NewClient(c, "")
+		dsclient, err := datastore.NewClient(ctx, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -399,18 +399,18 @@ func TransactionQueryHelperTest(c context.Context, cacher nds.Cacher) func(t *te
 		ancestor := datastore.NameKey("TransactionQueryHelperTest", "ancestor", nil)
 
 		key := datastore.IncompleteKey("TransactionQueryHelperTest", ancestor)
-		if key, err = ndsClient.Put(c, key, entity); err != nil {
+		if key, err = ndsClient.Put(ctx, key, entity); err != nil {
 			t.Fatalf("could not store entity due to error: %v", err)
 		}
 
-		defer ndsClient.Delete(c, key) // Cleanup
+		defer ndsClient.Delete(ctx, key) // Cleanup
 
-		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			var dest []testEntity
 			q := datastore.NewQuery("TransactionQueryHelperTest").Ancestor(ancestor)
 			q = tx.Query(q)
 
-			if _, err := dsclient.GetAll(c, q, &dest); err != nil {
+			if _, err := dsclient.GetAll(ctx, q, &dest); err != nil {
 				return err
 			}
 			if len(dest) != 1 || dest[0].Value != entity.Value {
@@ -423,12 +423,12 @@ func TransactionQueryHelperTest(c context.Context, cacher nds.Cacher) func(t *te
 		}
 
 		// only ancestor queries are allowed in transactions!
-		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			var dest []testEntity
 			q := datastore.NewQuery("TransactionQueryHelperTest")
 			q = tx.Query(q)
 
-			if _, err := dsclient.GetAll(c, q, &dest); err != nil {
+			if _, err := dsclient.GetAll(ctx, q, &dest); err != nil {
 				return err
 			}
 			return nil
@@ -439,9 +439,9 @@ func TransactionQueryHelperTest(c context.Context, cacher nds.Cacher) func(t *te
 	}
 }
 
-func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func TransactionOptionsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -451,7 +451,7 @@ func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testin
 		}
 
 		// Should be able to write to datastore, no issues
-		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			for i := 0; i < 25; i++ {
 				key := datastore.IncompleteKey("TransactionOptionsTest", nil)
 				if _, err := tx.Put(key, &testEntity{i}); err != nil {
@@ -466,7 +466,7 @@ func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testin
 		}
 
 		// ReadOnly transaction should result in an error
-		_, err = ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			for i := 0; i < 25; i++ {
 				key := datastore.IncompleteKey("TransactionOptionsTest", nil)
 				if _, err := tx.Put(key, &testEntity{i}); err != nil {
@@ -485,9 +485,9 @@ func TransactionOptionsTest(c context.Context, cacher nds.Cacher) func(t *testin
 
 // ClearNamespacedLocksTest tests to make sure that locks are cleared when
 // RunInTransaction is using a namespace.
-func ClearNamespacedLocksTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func ClearNamespacedLocksTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -502,13 +502,13 @@ func ClearNamespacedLocksTest(c context.Context, cacher nds.Cacher) func(t *test
 		key.Namespace = ns
 
 		// Prime cache.
-		if err := ndsClient.Get(c, key, &testEntity{}); err == nil {
+		if err := ndsClient.Get(ctx, key, &testEntity{}); err == nil {
 			t.Fatal("expected no such entity")
 		} else if err != datastore.ErrNoSuchEntity {
 			t.Fatal(err)
 		}
 
-		if _, err := ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		if _, err := ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 
 			if err := tx.Get(key, &testEntity{}); err == nil {
 				return errors.New("expected no such entity")
@@ -525,7 +525,7 @@ func ClearNamespacedLocksTest(c context.Context, cacher nds.Cacher) func(t *test
 		}
 
 		entity := &testEntity{}
-		if err := ndsClient.Get(c, key, entity); err != nil {
+		if err := ndsClient.Get(ctx, key, entity); err != nil {
 			t.Fatal(err)
 		}
 
@@ -534,6 +534,6 @@ func ClearNamespacedLocksTest(c context.Context, cacher nds.Cacher) func(t *test
 		}
 
 		// Cleanup
-		ndsClient.Delete(c, key)
+		ndsClient.Delete(ctx, key)
 	}
 }

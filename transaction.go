@@ -122,9 +122,5 @@ func (t *Transaction) commitCache() error {
 	// tx.Unlock() is not called as the tx context should never be called
 	// again so we rather block than allow people to misuse the context.
 	t.Lock()
-	cacheCtx, err := t.c.cacher.NewContext(t.ctx)
-	if err != nil {
-		return err
-	}
-	return t.c.cacher.SetMulti(cacheCtx, t.lockCacheItems)
+	return t.c.cacher.SetMulti(t.ctx, t.lockCacheItems)
 }

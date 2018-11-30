@@ -16,9 +16,9 @@ type Client struct {
 }
 
 type Config struct {
-	// CacheBackend is the caching backend you want to use when caching calls
+	// Cacher is the caching backend you want to use when caching calls
 	// to datastore.
-	CacheBackend Cacher
+	Cacher Cacher
 	// DatatstoreClient is the prepared client to use for interacting with
 	// Google Cloud Datastore with.
 	DatastoreClient *datastore.Client
@@ -35,7 +35,7 @@ type Config struct {
 // transparently use the cache configuration provided to cache requests when it can.
 func NewClient(ctx context.Context, cfg *Config) *Client {
 	return &Client{
-		cacher:    cfg.CacheBackend,
+		cacher:    cfg.Cacher,
 		ds:        cfg.DatastoreClient,
 		onErrorFn: cfg.OnError,
 	}

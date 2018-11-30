@@ -1,5 +1,5 @@
 // Package memory IS NOT MEANT TO BE USED - THIS IS FOR PROOF OF CONCEPT AND TESTING ONLY, IT
-// IS A LOCAL MEMORY STORE AND WILL RESULT IN INCONSISTENT CACHING FOR DSITRIBUTED SYSTEMS!
+// IS A LOCAL MEMORY STORE AND WILL RESULT IN INCONSISTENT CACHING FOR DISTRIBUTED SYSTEMS!
 package memory
 
 import (
@@ -30,10 +30,6 @@ type object struct {
 type memory struct {
 	store *cache.Cache
 	sync.RWMutex
-}
-
-func (m *memory) NewContext(c context.Context) (context.Context, error) {
-	return c, nil
 }
 
 func (m *memory) AddMulti(ctx context.Context, items []*nds.Item) error {

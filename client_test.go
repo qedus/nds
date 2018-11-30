@@ -38,7 +38,7 @@ func TestClient_onError(t *testing.T) {
 
 	// Default implementation
 	c := nds.NewClient(ctx, &nds.Config{
-		CacheBackend:    testCacher,
+		Cacher:    testCacher,
 		OnError:         nil,
 		DatastoreClient: dsClient,
 	})
@@ -56,7 +56,7 @@ func TestClient_onError(t *testing.T) {
 	// Custom implementation
 	var gotErr error
 	c = nds.NewClient(ctx, &nds.Config{
-		CacheBackend:    testCacher,
+		Cacher:    testCacher,
 		OnError:         func(ctx context.Context, err error) { gotErr = err },
 		DatastoreClient: dsClient,
 	})

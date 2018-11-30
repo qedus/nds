@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/datastore"
+	"google.golang.org/appengine/aetest"
 	"github.com/opencensus-integrations/redigo/redis"
 
 	"github.com/qedus/nds/v2"
 	"github.com/qedus/nds/v2/cachers/memory"
 	credis "github.com/qedus/nds/v2/cachers/redis"
+	"github.com/qedus/nds/v2/cachers/memcache"
 )
 
 var (
@@ -28,8 +30,6 @@ var (
 	}
 	cachersGuard      sync.Mutex
 	errNotDefined     = errors.New("undefined")
-	appEnginePreHook  func()
-	appEnginePostHook func()
 )
 
 type cacherTestItem struct {
@@ -40,72 +40,61 @@ type cacherTestItem struct {
 // mockCacher will use the cacher configured and provide hooks for each call
 type mockCacher struct {
 	// override hooks for corresponding cacher function calls
-	newContextHook     func(c context.Context) (context.Context, error)
-	addMultiHook       func(c context.Context, items []*nds.Item) error
-	compareAndSwapHook func(c context.Context, items []*nds.Item) error
-	deleteMultiHook    func(c context.Context, keys []string) error
-	getMultiHook       func(c context.Context, keys []string) (map[string]*nds.Item, error)
-	setMultiHook       func(c context.Context, items []*nds.Item) error
+	addMultiHook       func(ctx context.Context, items []*nds.Item) error
+	compareAndSwapHook func(ctx context.Context, items []*nds.Item) error
+	deleteMultiHook    func(ctx context.Context, keys []string) error
+	getMultiHook       func(ctx context.Context, keys []string) (map[string]*nds.Item, error)
+	setMultiHook       func(ctx context.Context, items []*nds.Item) error
 	// Fallback in case corresponding hook is not defined
 	cacher nds.Cacher
 }
 
-func (m *mockCacher) NewContext(c context.Context) (context.Context, error) {
-	if m.newContextHook != nil {
-		return m.newContextHook(c)
-	}
-	if m.cacher != nil {
-		return m.cacher.NewContext(c)
-	}
-	return nil, errNotDefined
-}
-
-func (m *mockCacher) AddMulti(c context.Context, items []*nds.Item) error {
+func (m *mockCacher) AddMulti(ctx context.Context, items []*nds.Item) error {
 	if m.addMultiHook != nil {
-		return m.addMultiHook(c, items)
+		return m.addMultiHook(ctx, items)
 	}
 	if m.cacher != nil {
-		return m.cacher.AddMulti(c, items)
+		return m.cacher.AddMulti(ctx, items)
 	}
 	return errNotDefined
 }
 
-func (m *mockCacher) CompareAndSwapMulti(c context.Context, items []*nds.Item) error {
+func (m *mockCacher) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) error {
 	if m.compareAndSwapHook != nil {
-		return m.compareAndSwapHook(c, items)
+		return m.compareAndSwapHook(ctx, items)
 	}
 	if m.cacher != nil {
-		return m.cacher.CompareAndSwapMulti(c, items)
+		return m.cacher.CompareAndSwapMulti(ctx, items)
 	}
 	return errNotDefined
 }
 
-func (m *mockCacher) DeleteMulti(c context.Context, keys []string) error {
+func (m *mockCacher) DeleteMulti(ctx context.Context, keys []string) error {
 	if m.deleteMultiHook != nil {
-		return m.deleteMultiHook(c, keys)
+		return m.deleteMultiHook(ctx, keys)
 	}
 	if m.cacher != nil {
-		return m.cacher.DeleteMulti(c, keys)
+		return m.cacher.DeleteMulti(ctx, keys)
 	}
 	return errNotDefined
 }
 
-func (m *mockCacher) GetMulti(c context.Context, keys []string) (map[string]*nds.Item, error) {
+func (m *mockCacher) GetMulti(ctx context.Context, keys []string) (map[string]*nds.Item, error) {
 	if m.getMultiHook != nil {
-		return m.getMultiHook(c, keys)
+		return m.getMultiHook(ctx, keys)
 	}
 	if m.cacher != nil {
-		return m.cacher.GetMulti(c, keys)
+		return m.cacher.GetMulti(ctx, keys)
 	}
 	return nil, errNotDefined
 }
 
-func (m *mockCacher) SetMulti(c context.Context, items []*nds.Item) error {
+func (m *mockCacher) SetMulti(ctx context.Context, items []*nds.Item) error {
 	if m.setMultiHook != nil {
-		return m.setMultiHook(c, items)
+		return m.setMultiHook(ctx, items)
 	}
 	if m.cacher != nil {
-		return m.cacher.SetMulti(c, items)
+		return m.cacher.SetMulti(ctx, items)
 	}
 	return errNotDefined
 }
@@ -140,29 +129,43 @@ func initRedis() {
 	cachers = append(cachers, cacherTestItem{ctx: context.Background(), cacher: cacher})
 }
 
+func initMemcache() func() {
+	if testing.Short() {
+		return func() {}
+	}
+	ctx, closeFunc, err := aetest.NewContext()
+	if err != nil {
+		panic(err)
+	}
+	cachersGuard.Lock()
+	defer cachersGuard.Unlock()
+	cachers = append(cachers, cacherTestItem{ctx: ctx, cacher: memcache.NewCacher()})
+	return closeFunc
+
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
-	if appEnginePreHook != nil {
-		appEnginePreHook()
-	}
+
 	initRedis()
+	close := initMemcache()
+
 	retCode := m.Run()
-	if appEnginePostHook != nil {
-		appEnginePostHook()
-	}
+	close()
+
 	os.Exit(retCode)
 }
 
-func NewClient(c context.Context, cacher nds.Cacher, t *testing.T) (*nds.Client, error) {
-	dsclient, err := datastore.NewClient(c, "")
+func NewClient(ctx context.Context, cacher nds.Cacher, t *testing.T) (*nds.Client, error) {
+	dsclient, err := datastore.NewClient(ctx, "")
 	if err != nil {
 		return nil, err
 	}
-	config := &nds.Config{CacheBackend: cacher, DatastoreClient: dsclient}
+	config := &nds.Config{Cacher: cacher, DatastoreClient: dsclient}
 	config.OnError = func(_ context.Context, err error) {
 		t.Log(err)
 	}
-	return nds.NewClient(c, config), nil
+	return nds.NewClient(ctx, config), nil
 }
 
 func TestCachers(t *testing.T) {
@@ -180,7 +183,7 @@ func TestCachers(t *testing.T) {
 
 }
 
-func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutGetDeleteTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		type testEntity struct {
 			IntVal int
@@ -190,14 +193,14 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 		seq := make(chan string, 3)
 		testCacher := &mockCacher{
 			cacher: cacher,
-			setMultiHook: func(c context.Context, items []*nds.Item) error {
+			setMultiHook: func(ctx context.Context, items []*nds.Item) error {
 				seq <- "cache.SetMulti"
-				return cacher.SetMulti(c, items)
+				return cacher.SetMulti(ctx, items)
 			},
-			deleteMultiHook: func(c context.Context, keys []string) error {
+			deleteMultiHook: func(ctx context.Context, keys []string) error {
 				seq <- "cache.DeleteMulti"
 				close(seq)
-				return cacher.DeleteMulti(c, keys)
+				return cacher.DeleteMulti(ctx, keys)
 			},
 		}
 		nds.SetDatastorePutMultiHook(func() error {
@@ -205,13 +208,13 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 			return nil
 		})
 
-		nsdClient, err := NewClient(c, testCacher, t)
+		nsdClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		incompleteKey := datastore.IncompleteKey("PutGetDeleteTest", nil)
-		key, err := nsdClient.Put(c, incompleteKey, &testEntity{43})
+		key, err := nsdClient.Put(ctx, incompleteKey, &testEntity{43})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,7 +240,7 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 		}
 
 		te := &testEntity{}
-		if err := nsdClient.Get(c, key, te); err != nil {
+		if err := nsdClient.Get(ctx, key, te); err != nil {
 			t.Fatal(err)
 		}
 
@@ -247,7 +250,7 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		// Get from cache.
 		te = &testEntity{}
-		if err := nsdClient.Get(c, key, te); err != nil {
+		if err := nsdClient.Get(ctx, key, te); err != nil {
 			t.Fatal(err)
 		}
 
@@ -256,13 +259,13 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 		}
 
 		// Change value.
-		if _, err := nsdClient.Put(c, key, &testEntity{64}); err != nil {
+		if _, err := nsdClient.Put(ctx, key, &testEntity{64}); err != nil {
 			t.Fatal(err)
 		}
 
 		// Get from cache.
 		te = &testEntity{}
-		if err := nsdClient.Get(c, key, te); err != nil {
+		if err := nsdClient.Get(ctx, key, te); err != nil {
 			t.Fatal(err)
 		}
 
@@ -270,19 +273,19 @@ func PutGetDeleteTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 			t.Fatal("te.Val != 64", te.IntVal)
 		}
 
-		if err := nsdClient.Delete(c, key); err != nil {
+		if err := nsdClient.Delete(ctx, key); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := nsdClient.Get(c, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
+		if err := nsdClient.Get(ctx, key, &testEntity{}); err != datastore.ErrNoSuchEntity {
 			t.Fatal("expected datastore.ErrNoSuchEntity")
 		}
 	}
 }
 
-func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func InterfacesTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -294,7 +297,7 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 		incompleteKey := datastore.IncompleteKey("InterfacesTest", nil)
 		incompleteKeys := []*datastore.Key{incompleteKey}
 		entities := []interface{}{&testEntity{43}}
-		keys, err := ndsClient.PutMulti(c, incompleteKeys, entities)
+		keys, err := ndsClient.PutMulti(ctx, incompleteKeys, entities)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -307,7 +310,7 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 		}
 
 		entities = []interface{}{&testEntity{}}
-		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -317,7 +320,7 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		// Get from cache.
 		entities = []interface{}{&testEntity{}}
-		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -327,13 +330,13 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		// Change value.
 		entities = []interface{}{&testEntity{64}}
-		if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+		if _, err := ndsClient.PutMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 
 		// Get from nds with struct.
 		entities = []interface{}{&testEntity{}}
-		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 
@@ -341,12 +344,12 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 			t.Fatal("te.Val != 64")
 		}
 
-		if err := ndsClient.DeleteMulti(c, keys); err != nil {
+		if err := ndsClient.DeleteMulti(ctx, keys); err != nil {
 			t.Fatal(err)
 		}
 
 		entities = []interface{}{testEntity{}}
-		err = ndsClient.GetMulti(c, keys, entities)
+		err = ndsClient.GetMulti(ctx, keys, entities)
 		if me, ok := err.(datastore.MultiError); ok {
 
 			if len(me) != 1 {
@@ -361,9 +364,9 @@ func InterfacesTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	}
 }
 
-func GetMultiNoSuchEntityTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func GetMultiNoSuchEntityTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -383,7 +386,7 @@ func GetMultiNoSuchEntityTest(c context.Context, cacher nds.Cacher) func(t *test
 				entities = append(entities, &testEntity{})
 			}
 
-			err := ndsClient.GetMulti(c, keys, entities)
+			err := ndsClient.GetMulti(ctx, keys, entities)
 			if me, ok := err.(datastore.MultiError); ok {
 				if len(me) != count {
 					t.Fatal("multi error length incorrect")
@@ -398,9 +401,9 @@ func GetMultiNoSuchEntityTest(c context.Context, cacher nds.Cacher) func(t *test
 	}
 }
 
-func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func GetMultiNoErrorsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -421,7 +424,7 @@ func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.
 			}
 
 			// Save entities.
-			if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+			if _, err := ndsClient.PutMulti(ctx, keys, entities); err != nil {
 				t.Fatal(err)
 			}
 
@@ -430,7 +433,7 @@ func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.
 				respEntities = append(respEntities, testEntity{})
 			}
 
-			if err := ndsClient.GetMulti(c, keys, respEntities); err != nil {
+			if err := ndsClient.GetMulti(ctx, keys, respEntities); err != nil {
 				t.Fatal(err)
 			}
 
@@ -445,9 +448,9 @@ func GetMultiNoErrorsTest(c context.Context, cacher nds.Cacher) func(t *testing.
 	}
 }
 
-func GetMultiErrorMixTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func GetMultiErrorMixTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -477,12 +480,12 @@ func GetMultiErrorMixTest(c context.Context, cacher nds.Cacher) func(t *testing.
 				}
 			}
 
-			if _, err := ndsClient.PutMulti(c, putKeys, putEntities); err != nil {
+			if _, err := ndsClient.PutMulti(ctx, putKeys, putEntities); err != nil {
 				t.Fatal(err)
 			}
 
 			respEntities := make([]testEntity, len(keys))
-			err := ndsClient.GetMulti(c, keys, respEntities)
+			err := ndsClient.GetMulti(ctx, keys, respEntities)
 			if err == nil {
 				t.Fatal("should be errors")
 			}
@@ -513,9 +516,9 @@ func GetMultiErrorMixTest(c context.Context, cacher nds.Cacher) func(t *testing.
 	}
 }
 
-func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func MultiCacheTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -543,7 +546,7 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 				putEntities = append(putEntities, entities[i])
 			}
 		}
-		if keys, err := ndsClient.PutMulti(c, putKeys, putEntities); err != nil {
+		if keys, err := ndsClient.PutMulti(ctx, putKeys, putEntities); err != nil {
 			t.Fatal(err)
 		} else if len(keys) != len(putKeys) {
 			t.Fatal("incorrect key len")
@@ -551,7 +554,7 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		// Get from nds.
 		respEntities := make([]testEntity, len(keys))
-		err = ndsClient.GetMulti(c, keys, respEntities)
+		err = ndsClient.GetMulti(ctx, keys, respEntities)
 		if err == nil {
 			t.Fatal("should be errors")
 		}
@@ -584,7 +587,7 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		// Get from local cache.
 		respEntities = make([]testEntity, len(keys))
-		err = ndsClient.GetMulti(c, keys, respEntities)
+		err = ndsClient.GetMulti(ctx, keys, respEntities)
 		if err == nil {
 			t.Fatal("should be errors")
 		}
@@ -617,7 +620,7 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 		// Get from cache.
 		respEntities = make([]testEntity, len(keys))
-		err = ndsClient.GetMulti(c, keys, respEntities)
+		err = ndsClient.GetMulti(ctx, keys, respEntities)
 		if err == nil {
 			t.Fatal("should be errors")
 		}
@@ -650,9 +653,9 @@ func MultiCacheTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 	}
 }
 
-func RunInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func RunInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -666,11 +669,11 @@ func RunInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.
 		entity := testEntity{42}
 		entities := []testEntity{entity}
 
-		if _, err = ndsClient.PutMulti(c, keys, entities); err != nil {
+		if _, err = ndsClient.PutMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 		var putKey *datastore.PendingKey
-		commit, err := ndsClient.RunInTransaction(c, func(tx *nds.Transaction) error {
+		commit, err := ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			entities := make([]testEntity, 1, 1)
 			if err := tx.GetMulti(keys, entities); err != nil {
 				t.Fatal(err)
@@ -703,7 +706,7 @@ func RunInTransactionTest(c context.Context, cacher nds.Cacher) func(t *testing.
 		}
 
 		entities = make([]testEntity, 1, 1)
-		if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}
 		entity = entities[0]

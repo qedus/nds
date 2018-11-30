@@ -124,20 +124,15 @@ func (c *Client) putMulti(ctx context.Context,
 	keys []*datastore.Key, vals interface{}) ([]*datastore.Key, error) {
 	lockCacheKeys, lockCacheItems := getCacheLocks(keys)
 
-	cacheCtx, err := c.cacher.NewContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	defer func() {
 		// Remove the locks.
-		if err := c.cacher.DeleteMulti(cacheCtx,
+		if err := c.cacher.DeleteMulti(ctx,
 			lockCacheKeys); err != nil {
 			c.onError(ctx, errors.Wrap(err, "putMulti cache.DeleteMulti"))
 		}
 	}()
 
-	if err := c.cacher.SetMulti(cacheCtx,
+	if err := c.cacher.SetMulti(ctx,
 		lockCacheItems); err != nil {
 		return nil, err
 	}

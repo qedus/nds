@@ -19,27 +19,6 @@ func TestCachersImplementations(t *testing.T) {
 
 func CacherImplementationTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		t.Run("NewContext", func(t *testing.T) {
-			// Make sure any context returned still has access to values we stored in it.
-			// Not a hard requirement as its not used in the nds package currently, but we
-			// we should enforce the same or a derivative of the passed in context is returned.
-			type key struct{}
-			testStr := "test"
-			want := &testStr
-			c := context.WithValue(ctx, key{}, want)
-			if got, err := cacher.NewContext(c); err != nil {
-				t.Fatalf("got a non-nill err when requesting a new context: %v", err)
-			} else if got == nil {
-				t.Fatalf("got a nil context")
-			} else {
-				if val, ok := got.Value(key{}).(*string); !ok {
-					t.Errorf("expected *string value from context, got %T", got)
-				} else if want != val {
-					t.Errorf("got = %v, want = %v", val, want)
-				}
-			}
-		})
-
 		// Test table used to test both Add/Get cacher calls
 		type args struct {
 			c     context.Context

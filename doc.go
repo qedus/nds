@@ -16,13 +16,12 @@ employed by this package.
 Use
 
 Package nds' Client is used exactly the same way as the cloud.google.com/go/datastore.Client for
-implemented calls. Ensure that you change all your datastore client Get, Put, Delete and
+implemented calls. Ensure that you change all your datastore client Get, Put, Delete, Mutate, and
 RunInTransaction function calls to use the nds client and Transaction type when converting your
 own code. The one caveat with transactions is when running queries, there is a helper function for
 adding the transaction to a datastore.Query.
 
-If you mix datastore and nds API calls then you are liable to get stale cache. Currently, Mutations
-are not supported (but are incoming!)
+If you mix datastore and nds API calls then you are liable to get stale cache.
 
 Implement your own cache
 

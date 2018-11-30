@@ -65,10 +65,6 @@ var bufPool = sync.Pool{
 	},
 }
 
-func (b *backend) NewContext(c context.Context) (context.Context, error) {
-	return c, nil
-}
-
 func (b *backend) AddMulti(ctx context.Context, items []*nds.Item) error {
 	redisConn := b.store.GetWithContext(ctx).(redis.ConnWithContext)
 	defer redisConn.CloseContext(ctx)

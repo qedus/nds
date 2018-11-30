@@ -28,9 +28,9 @@ func TestPutSuite(t *testing.T) {
 	}
 }
 
-func PutMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutMultiTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,21 +48,21 @@ func PutMultiTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
 				entities[i] = TestEntity{i}
 			}
 
-			if _, err := ndsClient.PutMulti(c, keys, entities); err != nil {
+			if _, err := ndsClient.PutMulti(ctx, keys, entities); err != nil {
 				t.Fatal(err)
 			}
 
 			entities = make([]TestEntity, count)
-			if err := ndsClient.GetMulti(c, keys, entities); err != nil {
+			if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 }
 
-func PutMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutMultiErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func PutMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 			{2},
 		}
 
-		_, err = ndsClient.PutMulti(c, keys, entities)
+		_, err = ndsClient.PutMulti(ctx, keys, entities)
 		me, ok := err.(datastore.MultiError)
 		if !ok {
 			t.Fatal("expected datastore.MultiError")
@@ -103,9 +103,9 @@ func PutMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) 
 	}
 }
 
-func PutMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutMultiNoPropertyListTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,15 +113,15 @@ func PutMultiNoPropertyListTest(c context.Context, cacher nds.Cacher) func(t *te
 		keys := []*datastore.Key{datastore.IDKey("Test", 1, nil)}
 		pl := datastore.PropertyList{datastore.Property{}}
 
-		if _, err := ndsClient.PutMulti(c, keys, pl); err == nil {
+		if _, err := ndsClient.PutMulti(ctx, keys, pl); err == nil {
 			t.Fatal("expecting no PropertyList error")
 		}
 	}
 }
 
-func PutPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutPropertyLoadSaverTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,13 +139,13 @@ func PutPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t *test
 		keys := []*datastore.Key{datastore.IDKey("Test", 1, nil)}
 
 		pls := datastore.PropertyList(pl)
-		if _, err := ndsClient.PutMulti(c, keys,
+		if _, err := ndsClient.PutMulti(ctx, keys,
 			[]datastore.PropertyLoadSaver{&pls}); err != nil {
 			t.Fatal(err)
 		}
 
 		getPl := datastore.PropertyList{}
-		if err := ndsClient.GetMulti(c,
+		if err := ndsClient.GetMulti(ctx,
 			keys, []datastore.PropertyLoadSaver{&getPl}); err != nil {
 			t.Fatal(err)
 		}
@@ -159,19 +159,19 @@ func PutPropertyLoadSaverTest(c context.Context, cacher nds.Cacher) func(t *test
 	}
 }
 
-func PutNilArgsTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutNilArgsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := ndsClient.Put(c, nil, nil); err == nil {
+		if _, err := ndsClient.Put(ctx, nil, nil); err == nil {
 			t.Fatal("expected error")
 		}
 	}
 }
 
-func PutMultiLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutMultiLockFailureTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
@@ -180,7 +180,7 @@ func PutMultiLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testi
 			},
 		}
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -192,14 +192,14 @@ func PutMultiLockFailureTest(c context.Context, cacher nds.Cacher) func(t *testi
 		keys := []*datastore.Key{datastore.IDKey("Test", 1, nil)}
 		vals := []testEntity{{42}}
 
-		if _, err := ndsClient.PutMulti(c, keys, vals); err == nil {
+		if _, err := ndsClient.PutMulti(ctx, keys, vals); err == nil {
 			t.Fatal("expected nds.PutMulti error")
 		}
 	}
 }
 
 // Make sure PutMulti still works if we have a cache unlock failure.
-func PutMultiUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutMultiUnlockCacheSuccessTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		testCacher := &mockCacher{
 			cacher: cacher,
@@ -208,7 +208,7 @@ func PutMultiUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t
 			},
 		}
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -220,13 +220,13 @@ func PutMultiUnlockCacheSuccessTest(c context.Context, cacher nds.Cacher) func(t
 		keys := []*datastore.Key{datastore.IDKey("Test", 1, nil)}
 		vals := []testEntity{{42}}
 
-		if _, err := ndsClient.PutMulti(c, keys, vals); err != nil {
+		if _, err := ndsClient.PutMulti(ctx, keys, vals); err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
-func PutDatastoreMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutDatastoreMultiErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
 		expectedErr := errors.New("expected error")
 
@@ -239,7 +239,7 @@ func PutDatastoreMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 		})
 		defer nds.SetDatastorePutMultiHook(nil)
 
-		ndsClient, err := NewClient(c, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -251,7 +251,7 @@ func PutDatastoreMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 		key := datastore.IDKey("Test", 1, nil)
 		val := &testEntity{42}
 
-		if _, err := ndsClient.Put(c, key, val); err == nil {
+		if _, err := ndsClient.Put(ctx, key, val); err == nil {
 			t.Fatal("expected error")
 		} else if err != expectedErr {
 			t.Fatal("should be expectedErr")
@@ -259,14 +259,14 @@ func PutDatastoreMultiErrorTest(c context.Context, cacher nds.Cacher) func(t *te
 	}
 }
 
-func PutMultiZeroKeysTest(c context.Context, cacher nds.Cacher) func(t *testing.T) {
+func PutMultiZeroKeysTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(c, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := ndsClient.PutMulti(c, []*datastore.Key{},
+		if _, err := ndsClient.PutMulti(ctx, []*datastore.Key{},
 			[]interface{}{}); err != nil {
 			t.Fatal(err)
 		}

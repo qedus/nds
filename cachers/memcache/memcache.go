@@ -9,44 +9,35 @@ import (
 	"github.com/qedus/nds/v2"
 )
 
-type backend struct {
-	// namespace is the namespace where all memcached entities are
-	// stored.
-	namespace string
+type backend struct {}
+
+// NewCacher will return a nds.Cacher backed by AppEngine's memcache.
+func NewCacher() nds.Cacher {
+	return &backend{}
 }
 
-// NewCacher will return a nds.Cacher backed by AppEngine's memcache,
-// utilizing the provided namespace, if any.
-func NewCacher(namespace string) nds.Cacher {
-	return &backend{namespace}
+func (m *backend) AddMulti(ctx context.Context, items []*nds.Item) error {
+	return convertToNDSMultiError(memcache.AddMulti(ctx, convertToMemcacheItems(items)))
 }
 
-func (m *backend) NewContext(c context.Context) (context.Context, error) {
-	return appengine.Namespace(c, m.namespace)
+func (m *backend) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) error {
+	return convertToNDSMultiError(memcache.CompareAndSwapMulti(ctx, convertToMemcacheItems(items)))
 }
 
-func (m *backend) AddMulti(c context.Context, items []*nds.Item) error {
-	return convertToNDSMultiError(memcache.AddMulti(c, convertToMemcacheItems(items)))
+func (m *backend) DeleteMulti(ctx context.Context, keys []string) error {
+	return convertToNDSMultiError(memcache.DeleteMulti(ctx, keys))
 }
 
-func (m *backend) CompareAndSwapMulti(c context.Context, items []*nds.Item) error {
-	return convertToNDSMultiError(memcache.CompareAndSwapMulti(c, convertToMemcacheItems(items)))
-}
-
-func (m *backend) DeleteMulti(c context.Context, keys []string) error {
-	return convertToNDSMultiError(memcache.DeleteMulti(c, keys))
-}
-
-func (m *backend) GetMulti(c context.Context, keys []string) (map[string]*nds.Item, error) {
-	items, err := memcache.GetMulti(c, keys)
+func (m *backend) GetMulti(ctx context.Context, keys []string) (map[string]*nds.Item, error) {
+	items, err := memcache.GetMulti(ctx, keys)
 	if err != nil {
 		return nil, convertToNDSMultiError(err)
 	}
 	return convertFromMemcacheItems(items), nil
 }
 
-func (m *backend) SetMulti(c context.Context, items []*nds.Item) error {
-	return memcache.SetMulti(c, convertToMemcacheItems(items))
+func (m *backend) SetMulti(ctx context.Context, items []*nds.Item) error {
+	return memcache.SetMulti(ctx, convertToMemcacheItems(items))
 }
 
 func convertToMemcacheItems(items []*nds.Item) []*memcache.Item {
