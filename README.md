@@ -12,7 +12,7 @@ One other benefit is that the standard `datastore.Client.GetMulti`, `datastore.C
 
 ## How To Use
 
-You can use this package in _exactly_ the same way you would use [`code.google.com/go/datastore.Client`](https://godoc.org/cloud.google.com/go/datastore#Client) for methods provided by `nds.Client`. However,it is important that you use a `nds.Client` entirely within your code. Do not mix use of those functions with the `code.google.com/go/datastore.Client` equivalents as you will be liable to get stale datastore entities from `github.com/qedus/nds`.
+You can use this package in _exactly_ the same way you would use [`code.google.com/go/datastore.Client`](https://godoc.org/cloud.google.com/go/datastore#Client) for methods provided by `nds.Client`. However, it is important that you use a `nds.Client` entirely within your code. Do not mix use of those functions with the `code.google.com/go/datastore.Client` equivalents as you will be liable to get stale datastore entities from `github.com/qedus/nds`.
 
 Ultimately all you need to do is:
 
