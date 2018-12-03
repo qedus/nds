@@ -16,7 +16,7 @@ func TestDeleteSuite(t *testing.T) {
 	for _, item := range cachers {
 		t.Run(fmt.Sprintf("cacher=%T", item.cacher), func(t *testing.T) {
 			t.Run("DeleteMultiTest", DeleteMultiTest(item.ctx, item.cacher))
-			//t.Run("DeleteNilKeyTest", DeleteNilKeyTest(item.ctx, item.cacher))
+			t.Run("DeleteNilKeyTest", DeleteNilKeyTest(item.ctx, item.cacher))
 			t.Run("DeleteIncompleteKeyTest", DeleteIncompleteKeyTest(item.ctx, item.cacher))
 			t.Run("DeleteCacheFailTest", DeleteCacheFailTest(item.ctx, item.cacher))
 			t.Run("DeleteInTransactionTest", DeleteInTransactionTest(item.ctx, item.cacher))
