@@ -62,7 +62,9 @@ var (
 // avoid being mistakenly passed when []datastore.PropertyList was intended.
 func (c *Client) GetMulti(ctx context.Context,
 	keys []*datastore.Key, vals interface{}) error {
-
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds.GetMulti")
+	defer span.End()
 	v := reflect.ValueOf(vals)
 	if err := checkKeysValues(keys, v); err != nil {
 		return err
@@ -107,6 +109,9 @@ func (c *Client) GetMulti(ctx context.Context,
 // unexported in the destination struct. ErrFieldMismatch is only returned if
 // val is a struct pointer.
 func (c *Client) Get(ctx context.Context, key *datastore.Key, val interface{}) error {
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds.Get")
+	defer span.End()
 	// GetMulti catches nil interface; we need to catch nil ptr here.
 	if val == nil {
 		return datastore.ErrInvalidEntityType
@@ -148,43 +153,44 @@ type cacheItem struct {
 // including http://goo.gl/3ByVlA.
 func (c *Client) getMulti(ctx context.Context,
 	keys []*datastore.Key, vals reflect.Value) error {
-	var span *trace.Span
-	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds/datastore.Get")
-	defer span.End()
 
-	cacheItems := make([]cacheItem, len(keys))
-	for i, key := range keys {
-		cacheItems[i].key = key
-		cacheItems[i].cacheKey = createCacheKey(key)
-		cacheItems[i].val = vals.Index(i)
-		cacheItems[i].state = miss
-	}
+	if c.cacher != nil {
 
-	cacheHits := c.loadCache(ctx, cacheItems)
-	cacheMisses := len(cacheItems) - cacheHits
-	stats.Record(ctx, mCacheHit.M(int64(cacheHits)))
-	stats.Record(ctx, mCacheMiss.M(int64(cacheMisses)))
-
-	c.lockCache(ctx, cacheItems)
-
-	if err := c.loadDatastore(ctx, cacheItems, vals.Type()); err != nil {
-		return err
-	}
-
-	c.saveCache(ctx, cacheItems)
-
-	me, errsNil := make(datastore.MultiError, len(cacheItems)), true
-	for i, cacheItem := range cacheItems {
-		if cacheItem.err != nil {
-			me[i] = cacheItem.err
-			errsNil = false
+		cacheItems := make([]cacheItem, len(keys))
+		for i, key := range keys {
+			cacheItems[i].key = key
+			cacheItems[i].cacheKey = createCacheKey(key)
+			cacheItems[i].val = vals.Index(i)
+			cacheItems[i].state = miss
 		}
-	}
 
-	if errsNil {
-		return nil
+		cacheHits := c.loadCache(ctx, cacheItems)
+		cacheMisses := len(cacheItems) - cacheHits
+		stats.Record(ctx, mCacheHit.M(int64(cacheHits)))
+		stats.Record(ctx, mCacheMiss.M(int64(cacheMisses)))
+
+		c.lockCache(ctx, cacheItems)
+
+		if err := c.loadDatastore(ctx, cacheItems, vals.Type()); err != nil {
+			return err
+		}
+
+		c.saveCache(ctx, cacheItems)
+
+		me, errsNil := make(datastore.MultiError, len(cacheItems)), true
+		for i, cacheItem := range cacheItems {
+			if cacheItem.err != nil {
+				me[i] = cacheItem.err
+				errsNil = false
+			}
+		}
+
+		if errsNil {
+			return nil
+		}
+		return me
 	}
-	return me
+	return c.Client.GetMulti(ctx, keys, vals.Interface())
 }
 
 // loadCache will return the # of cache hits
@@ -356,7 +362,7 @@ func (c *Client) loadDatastore(ctx context.Context, cacheItems []cacheItem,
 	}
 
 	var me datastore.MultiError
-	if err := c.ds.GetMulti(ctx, keys, vals); err == nil {
+	if err := c.Client.GetMulti(ctx, keys, vals); err == nil {
 		me = make(datastore.MultiError, len(keys))
 	} else if e, ok := err.(datastore.MultiError); ok {
 		me = e

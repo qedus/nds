@@ -12,7 +12,8 @@ type OnErrorFunc func(ctx context.Context, err error)
 type Client struct {
 	cacher    Cacher
 	onErrorFn OnErrorFunc
-	ds        *datastore.Client
+
+	*datastore.Client
 }
 
 type Config struct {
@@ -33,12 +34,24 @@ type Config struct {
 
 // NewClient will return an nds.Client that can be used exactly like a datastore.Client but will
 // transparently use the cache configuration provided to cache requests when it can.
-func NewClient(ctx context.Context, cfg *Config) *Client {
+func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
+	if cfg == nil {
+		cfg = &Config{}
+	}
+
+	if cfg.DatastoreClient == nil {
+		if ds, err := datastore.NewClient(ctx, ""); err != nil {
+			return nil, err
+		} else {
+			cfg.DatastoreClient = ds
+		}
+	}
+
 	return &Client{
 		cacher:    cfg.Cacher,
-		ds:        cfg.DatastoreClient,
 		onErrorFn: cfg.OnError,
-	}
+		Client:    cfg.DatastoreClient,
+	}, nil
 }
 
 func (c *Client) onError(ctx context.Context, err error) {

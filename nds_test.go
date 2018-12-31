@@ -157,15 +157,11 @@ func TestMain(m *testing.M) {
 }
 
 func NewClient(ctx context.Context, cacher nds.Cacher, t *testing.T) (*nds.Client, error) {
-	dsclient, err := datastore.NewClient(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	config := &nds.Config{Cacher: cacher, DatastoreClient: dsclient}
+	config := &nds.Config{Cacher: cacher}
 	config.OnError = func(_ context.Context, err error) {
 		t.Log(err)
 	}
-	return nds.NewClient(ctx, config), nil
+	return nds.NewClient(ctx, config)
 }
 
 func TestCachers(t *testing.T) {
@@ -798,4 +794,57 @@ func TestCreateCacheKey(t *testing.T) {
 	if len(cacheKey) > maxKeySize {
 		t.Fatal("incorrect cache key size")
 	}
+}
+
+func TestNilCacher(t *testing.T) {
+	ctx := context.Background()
+	client, err := nds.NewClient(ctx, nil)
+
+	if err != nil {
+		t.Fatalf("could not get client due to error: %v", err)
+	}
+
+	type testEntity struct {
+		IntVal int
+	}
+
+
+	key := datastore.NameKey("nilcacher", "test-ent", nil)
+	ent := testEntity{32}
+
+	if _, err = client.Put(ctx, key, &ent); err != nil {
+		t.Fatalf("could not put: %v", err)
+	}
+
+	if _, err = client.RunInTransaction(ctx, func(tx *nds.Transaction) error {
+		if _, err := tx.Put(key, &testEntity{65}); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		t.Fatalf("could not execute transaction: %v", err)
+	}
+
+	ent.IntVal = 99
+
+	if _, err = client.Mutate(ctx, nds.NewUpdate(key, &ent)); err != nil {
+		t.Fatalf("could not mutate: %v", err)
+	}
+
+	getEnt := &testEntity{}
+
+	if err = client.Get(ctx, key, getEnt); err != nil {
+		t.Fatalf("could not get: %v", err)
+	} else if getEnt.IntVal != ent.IntVal {
+		t.Fatalf("got `%d`, wanted `%d`", getEnt.IntVal, ent.IntVal)
+	}
+
+	if err = client.Delete(ctx, key); err != nil {
+		t.Fatalf("could not delete: %v", err)
+	}
+
+
+
+
 }

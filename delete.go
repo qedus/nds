@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/datastore"
+	"go.opencensus.io/trace"
 )
 
 // deleteMultiLimit is the Google Cloud Datastore limit for the maximum number
@@ -17,6 +18,9 @@ const deleteMultiLimit = 500
 // 500 entities per request by calling the datastore as many times as required
 // to put all the keys. It does this efficiently and concurrently.
 func (c *Client) DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds.DeleteMulti")
+	defer span.End()
 
 	callCount := (len(keys)-1)/deleteMultiLimit + 1
 	errs := make([]error, callCount)
@@ -46,6 +50,9 @@ func (c *Client) DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
 
 // Delete deletes the entity for the given key.
 func (c *Client) Delete(ctx context.Context, key *datastore.Key) error {
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds.Delete")
+	defer span.End()
 	err := c.deleteMulti(ctx, []*datastore.Key{key})
 	if me, ok := err.(datastore.MultiError); ok {
 		return me[0]
@@ -56,14 +63,15 @@ func (c *Client) Delete(ctx context.Context, key *datastore.Key) error {
 // deleteMulti will batch delete keys by first locking the corresponding items in the
 // cache then deleting them from datastore.
 func (c *Client) deleteMulti(ctx context.Context, keys []*datastore.Key) error {
+	if c.cacher != nil {
+		_, lockCacheItems := getCacheLocks(keys)
 
-	_, lockCacheItems := getCacheLocks(keys)
-
-	// Make sure we can lock the cache with no errors before deleting.
-	if err := c.cacher.SetMulti(ctx,
-		lockCacheItems); err != nil {
-		return err
+		// Make sure we can lock the cache with no errors before deleting.
+		if err := c.cacher.SetMulti(ctx,
+			lockCacheItems); err != nil {
+			return err
+		}
 	}
 
-	return c.ds.DeleteMulti(ctx, keys)
+	return c.Client.DeleteMulti(ctx, keys)
 }

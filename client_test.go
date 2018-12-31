@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"cloud.google.com/go/datastore"
-
 	"github.com/qedus/nds/v2"
 	"github.com/qedus/nds/v2/cachers/memory"
 )
@@ -37,11 +36,14 @@ func TestClient_onError(t *testing.T) {
 	testObj := []testObject{{}}
 
 	// Default implementation
-	c := nds.NewClient(ctx, &nds.Config{
-		Cacher:    testCacher,
+	c, err := nds.NewClient(ctx, &nds.Config{
+		Cacher:          testCacher,
 		OnError:         nil,
 		DatastoreClient: dsClient,
 	})
+	if err != nil {
+		t.Fatalf("could not make nds client due to error: %v", err)
+	}
 
 	buf := bytes.NewBuffer(nil)
 	log.SetOutput(buf)
@@ -55,13 +57,16 @@ func TestClient_onError(t *testing.T) {
 
 	// Custom implementation
 	var gotErr error
-	c = nds.NewClient(ctx, &nds.Config{
-		Cacher:    testCacher,
+	c, err = nds.NewClient(ctx, &nds.Config{
+		Cacher:          testCacher,
 		OnError:         func(ctx context.Context, err error) { gotErr = err },
 		DatastoreClient: dsClient,
 	})
+	if err != nil {
+		t.Fatalf("could not make nds client due to error: %v", err)
+	}
 
-	if err := c.GetMulti(ctx, testKeys, testObj); err == nil {
+	if err = c.GetMulti(ctx, testKeys, testObj); err == nil {
 		t.Errorf("Expected non-nil err, got %v", err)
 	} else if !strings.Contains(gotErr.Error(), testErr.Error()) {
 		t.Log(err)
@@ -69,3 +74,45 @@ func TestClient_onError(t *testing.T) {
 	}
 
 }
+
+func TestNewClient(t *testing.T) {
+	cctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	type args struct {
+		ctx context.Context
+		cfg *nds.Config
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			"nil test",
+			args{
+				ctx: context.Background(),
+				cfg: nil,
+			},
+			false,
+		},
+		{
+			"bad context test",
+			args{
+				ctx: cctx,
+				cfg: nil,
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := nds.NewClient(tt.args.ctx, tt.args.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewClient() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}
+

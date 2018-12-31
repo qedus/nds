@@ -5,6 +5,7 @@ import (
 
 	"cloud.google.com/go/datastore"
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
 var (
@@ -60,6 +61,10 @@ func NewUpsert(k *datastore.Key, src interface{}) *Mutation {
 }
 
 func (c *Client) Mutate(ctx context.Context, muts ...*Mutation) ([]*datastore.Key, error) {
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds.Mutate")
+	defer span.End()
+
 	toLock := make([]*datastore.Key, 0, len(muts))
 	toLockRelease := make([]*datastore.Key, 0, len(muts))
 	mutations := make([]*datastore.Mutation, len(muts))
@@ -79,28 +84,30 @@ func (c *Client) Mutate(ctx context.Context, muts ...*Mutation) ([]*datastore.Ke
 		}
 	}
 
-	releaseCacheKeys, lockCacheItems := getCacheLocks(toLockRelease)
-	_, moreLockCacheItems := getCacheLocks(toLock)
-	lockCacheItems = append(lockCacheItems, moreLockCacheItems...)
+	if c.cacher != nil {
+		releaseCacheKeys, lockCacheItems := getCacheLocks(toLockRelease)
+		_, moreLockCacheItems := getCacheLocks(toLock)
+		lockCacheItems = append(lockCacheItems, moreLockCacheItems...)
 
-	defer func() {
-		// Optimistcally remove the locks.
-		if err := c.cacher.DeleteMulti(ctx,
-			releaseCacheKeys); err != nil {
-			c.onError(ctx, errors.Wrap(err, "Mutate cache.DeleteMulti"))
-		}
-	}()
+		defer func() {
+			// Optimistcally remove the locks.
+			if err := c.cacher.DeleteMulti(ctx,
+				releaseCacheKeys); err != nil {
+				c.onError(ctx, errors.Wrap(err, "Mutate cache.DeleteMulti"))
+			}
+		}()
 
-	if err := c.cacher.SetMulti(ctx,
-		lockCacheItems); err != nil {
-		return nil, err
-	}
-
-	if mutateHook != nil {
-		if err := mutateHook(); err != nil {
+		if err := c.cacher.SetMulti(ctx,
+			lockCacheItems); err != nil {
 			return nil, err
 		}
+
+		if mutateHook != nil {
+			if err := mutateHook(); err != nil {
+				return nil, err
+			}
+		}
 	}
 
-	return c.ds.Mutate(ctx, mutations...)
+	return c.Client.Mutate(ctx, mutations...)
 }

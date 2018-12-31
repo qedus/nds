@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/datastore"
+	"go.opencensus.io/trace"
 )
 
 type Transaction struct {
@@ -20,16 +21,18 @@ func (t *Transaction) lockKey(key *datastore.Key) {
 }
 
 func (t *Transaction) lockKeys(keys []*datastore.Key) {
-	_, lockCacheItems := getCacheLocks(keys)
-	t.Lock()
-	t.lockCacheItems = append(t.lockCacheItems,
-		lockCacheItems...)
-	t.Unlock()
+	if t.c.cacher != nil {
+		_, lockCacheItems := getCacheLocks(keys)
+		t.Lock()
+		t.lockCacheItems = append(t.lockCacheItems,
+			lockCacheItems...)
+		t.Unlock()
+	}
 }
 
 // NewTransaction will start a new datastore.Trnsaction wrapped by nds to properly update the cache
 func (c *Client) NewTransaction(ctx context.Context, opts ...datastore.TransactionOption) (t *Transaction, err error) {
-	tx, err := c.ds.NewTransaction(ctx, opts...)
+	tx, err := c.Client.NewTransaction(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +74,11 @@ func (t *Transaction) DeleteMulti(keys []*datastore.Key) (err error) {
 
 // Commit will commit the cache changes, then commit the transaction
 func (t *Transaction) Commit() (*datastore.Commit, error) {
+	// TODO: This trace won't be the parent of the internal transaction's trace for commit - is that ok?
+	var span *trace.Span
+	_, span = trace.StartSpan(t.ctx, "github.com/qedus/nds.Transaction.Commit")
+	defer span.End()
+
 	if err := t.commitCache(); err != nil {
 		return nil, err
 	}
@@ -106,8 +114,11 @@ func (t *Transaction) Mutate(muts ...*Mutation) ([]*datastore.PendingKey, error)
 // interacts correctly with the cache. You should always use this method for
 // transactions if you are using the NDS package.
 func (c *Client) RunInTransaction(ctx context.Context, f func(tx *Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error) {
+	var span *trace.Span
+	ctx, span = trace.StartSpan(ctx, "github.com/qedus/nds.RunInTransaction")
+	defer span.End()
 
-	return c.ds.RunInTransaction(ctx, func(tx *datastore.Transaction) error {
+	return c.Client.RunInTransaction(ctx, func(tx *datastore.Transaction) error {
 		txn := &Transaction{c: c, ctx: ctx, tx: tx}
 		if err := f(txn); err != nil {
 			return err
@@ -122,5 +133,8 @@ func (t *Transaction) commitCache() error {
 	// tx.Unlock() is not called as the tx context should never be called
 	// again so we rather block than allow people to misuse the context.
 	t.Lock()
-	return t.c.cacher.SetMulti(t.ctx, t.lockCacheItems)
+	if t.c.cacher != nil {
+		return t.c.cacher.SetMulti(t.ctx, t.lockCacheItems)
+	}
+	return nil
 }
