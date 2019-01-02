@@ -15,21 +15,21 @@ import (
 	"time"
 
 	"cloud.google.com/go/datastore"
-	"google.golang.org/appengine/aetest"
 	"github.com/opencensus-integrations/redigo/redis"
+	"google.golang.org/appengine/aetest"
 
 	"github.com/qedus/nds/v2"
+	"github.com/qedus/nds/v2/cachers/memcache"
 	"github.com/qedus/nds/v2/cachers/memory"
 	credis "github.com/qedus/nds/v2/cachers/redis"
-	"github.com/qedus/nds/v2/cachers/memcache"
 )
 
 var (
 	cachers = []cacherTestItem{
 		cacherTestItem{ctx: context.Background(), cacher: memory.NewCacher()},
 	}
-	cachersGuard      sync.Mutex
-	errNotDefined     = errors.New("undefined")
+	cachersGuard  sync.Mutex
+	errNotDefined = errors.New("undefined")
 )
 
 type cacherTestItem struct {
@@ -157,11 +157,10 @@ func TestMain(m *testing.M) {
 }
 
 func NewClient(ctx context.Context, cacher nds.Cacher, t *testing.T) (*nds.Client, error) {
-	config := &nds.Config{Cacher: cacher}
-	config.OnError = func(_ context.Context, err error) {
+	onErrorFn := func(_ context.Context, err error) {
 		t.Log(err)
 	}
-	return nds.NewClient(ctx, config)
+	return nds.NewClient(ctx, cacher, nds.WithOnErrorFunc(onErrorFn))
 }
 
 func TestCachers(t *testing.T) {
@@ -808,7 +807,6 @@ func TestNilCacher(t *testing.T) {
 		IntVal int
 	}
 
-
 	key := datastore.NameKey("nilcacher", "test-ent", nil)
 	ent := testEntity{32}
 
@@ -843,8 +841,5 @@ func TestNilCacher(t *testing.T) {
 	if err = client.Delete(ctx, key); err != nil {
 		t.Fatalf("could not delete: %v", err)
 	}
-
-
-
 
 }

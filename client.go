@@ -16,41 +16,57 @@ type Client struct {
 	*datastore.Client
 }
 
+// ClientOption is an option for a nds Client.
+// Inspired by Google's api/option package.
+type ClientOption func(*Config)
+
 type Config struct {
-	// Cacher is the caching backend you want to use when caching calls
-	// to datastore.
-	Cacher Cacher
 	// DatatstoreClient is the prepared client to use for interacting with
 	// Google Cloud Datastore with.
-	DatastoreClient *datastore.Client
+	datastoreClient *datastore.Client
 	// OnError is called for every internal error that doesn't return to the
 	// caller but maybe useful to capture for logging/debugging/reporting
 	// purposes. For example, to keep the original nds.v1 behavior of logging
 	// warnings in AppEngine Standard, this could be:
 	// func(ctx context.Context, err error) { log.Warningf(ctx, "%s", err) }
 	// By default this will log the error using the standard go log package.
-	OnError OnErrorFunc
+	onErrorFn OnErrorFunc
+}
+
+func WithDatastoreClient(ds *datastore.Client) ClientOption {
+	return func(c *Config) {
+		c.datastoreClient = ds
+	}
+}
+
+func WithOnErrorFunc(f OnErrorFunc) ClientOption {
+	return func(c *Config) {
+		c.onErrorFn = f
+	}
 }
 
 // NewClient will return an nds.Client that can be used exactly like a datastore.Client but will
 // transparently use the cache configuration provided to cache requests when it can.
-func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
-	if cfg == nil {
-		cfg = &Config{}
+func NewClient(ctx context.Context, cacher Cacher, opts ...ClientOption) (*Client, error) {
+	var cfg Config
+
+	for _, opt := range opts {
+		opt(&cfg)
 	}
 
-	if cfg.DatastoreClient == nil {
+	if cfg.datastoreClient == nil {
+		// Default datastore.Client
 		if ds, err := datastore.NewClient(ctx, ""); err != nil {
 			return nil, err
 		} else {
-			cfg.DatastoreClient = ds
+			cfg.datastoreClient = ds
 		}
 	}
 
 	return &Client{
-		cacher:    cfg.Cacher,
-		onErrorFn: cfg.OnError,
-		Client:    cfg.DatastoreClient,
+		cacher:    cacher,
+		onErrorFn: cfg.onErrorFn,
+		Client:    cfg.datastoreClient,
 	}, nil
 }
 

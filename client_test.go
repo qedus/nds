@@ -36,11 +36,7 @@ func TestClient_onError(t *testing.T) {
 	testObj := []testObject{{}}
 
 	// Default implementation
-	c, err := nds.NewClient(ctx, &nds.Config{
-		Cacher:          testCacher,
-		OnError:         nil,
-		DatastoreClient: dsClient,
-	})
+	c, err := nds.NewClient(ctx, testCacher, nds.WithDatastoreClient(dsClient))
 	if err != nil {
 		t.Fatalf("could not make nds client due to error: %v", err)
 	}
@@ -57,11 +53,8 @@ func TestClient_onError(t *testing.T) {
 
 	// Custom implementation
 	var gotErr error
-	c, err = nds.NewClient(ctx, &nds.Config{
-		Cacher:          testCacher,
-		OnError:         func(ctx context.Context, err error) { gotErr = err },
-		DatastoreClient: dsClient,
-	})
+	onErrFn := func(ctx context.Context, err error) { gotErr = err }
+	c, err = nds.NewClient(ctx, testCacher, nds.WithDatastoreClient(dsClient), nds.WithOnErrorFunc(onErrFn))
 	if err != nil {
 		t.Fatalf("could not make nds client due to error: %v", err)
 	}
@@ -81,7 +74,7 @@ func TestNewClient(t *testing.T) {
 
 	type args struct {
 		ctx context.Context
-		cfg *nds.Config
+		cacher nds.Cacher
 	}
 	tests := []struct {
 		name    string
@@ -92,7 +85,7 @@ func TestNewClient(t *testing.T) {
 			"nil test",
 			args{
 				ctx: context.Background(),
-				cfg: nil,
+				cacher: nil,
 			},
 			false,
 		},
@@ -100,14 +93,14 @@ func TestNewClient(t *testing.T) {
 			"bad context test",
 			args{
 				ctx: cctx,
-				cfg: nil,
+				cacher: nil,
 			},
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := nds.NewClient(tt.args.ctx, tt.args.cfg)
+			_, err := nds.NewClient(tt.args.ctx, tt.args.cacher)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
