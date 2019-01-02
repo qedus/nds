@@ -53,6 +53,7 @@ func init() {
 	gob.Register(time.Time{})
 	gob.Register(&datastore.Key{})
 	gob.Register(datastore.GeoPoint{})
+	gob.Register(&datastore.Entity{})
 }
 
 type valueType int

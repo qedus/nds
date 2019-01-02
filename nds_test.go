@@ -712,6 +712,11 @@ func RunInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 }
 
 func TestMarshalUnmarshalPropertyList(t *testing.T) {
+
+	type Int struct {
+		Int int64
+	}
+
 	timeVal := time.Now()
 	timeProp := datastore.Property{Name: "Time",
 		Value: timeVal, NoIndex: false}
@@ -724,10 +729,23 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 	geoPointProp := datastore.Property{Name: "GeoPoint",
 		Value: geoPointVal, NoIndex: false}
 
+	entityVal := &datastore.Entity{
+		Properties: []datastore.Property{
+			datastore.Property{
+				Name: "Int",
+				Value: int64(6),
+				NoIndex: false,
+			},
+		},
+	}
+	entityProp := datastore.Property{Name: "Entity",
+	Value: entityVal, NoIndex: false}
+
 	pl := datastore.PropertyList{
 		timeProp,
 		keyProp,
 		geoPointProp,
+		entityProp,
 	}
 	data, err := nds.MarshalPropertyList(pl)
 	if err != nil {
@@ -738,6 +756,7 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 		Time     time.Time
 		Key      *datastore.Key
 		GeoPoint datastore.GeoPoint
+		Entity Int
 	}{}
 
 	pl = datastore.PropertyList{}
@@ -758,6 +777,10 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 
 	if !reflect.DeepEqual(testEntity.GeoPoint, geoPointVal) {
 		t.Fatal("geoPointVal not equal")
+	}
+
+	if !reflect.DeepEqual(testEntity.Entity.Int, entityVal.Properties[0].Value) {
+		t.Fatal("entityVal not equal")
 	}
 }
 
