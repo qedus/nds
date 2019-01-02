@@ -117,7 +117,14 @@ func (c *Client) Get(ctx context.Context, key *datastore.Key, val interface{}) e
 		return datastore.ErrInvalidEntityType
 	}
 
-	err := c.GetMulti(ctx, []*datastore.Key{key}, []interface{}{val})
+	keys := []*datastore.Key{key}
+	vals := []interface{}{val}
+	v := reflect.ValueOf(vals)
+	if err := checkKeysValues(keys, v); err != nil {
+		return err
+	}
+
+	err := c.getMulti(ctx, keys, v)
 	if me, ok := err.(datastore.MultiError); ok {
 		return me[0]
 	}

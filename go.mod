@@ -10,7 +10,7 @@ require (
 	golang.org/x/net v0.0.0-20181220203305-927f97764cc3 // indirect
 	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
 	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect
-	golang.org/x/sys v0.0.0-20181228144115-9a3f9b0469bb // indirect
+	golang.org/x/sys v0.0.0-20190102155601-82a175fd1598 // indirect
 	google.golang.org/api v0.0.0-20181229000844-f26a60c56f14 // indirect
 	google.golang.org/appengine v1.4.0
 	google.golang.org/genproto v0.0.0-20181221175505-bd9b4fb69e2f // indirect
