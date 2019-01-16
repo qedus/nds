@@ -11,7 +11,6 @@ import (
 
 	"cloud.google.com/go/datastore"
 	"github.com/pkg/errors"
-	"go.opencensus.io/stats"
 	"go.opencensus.io/trace"
 )
 
@@ -171,10 +170,8 @@ func (c *Client) getMulti(ctx context.Context,
 			cacheItems[i].state = miss
 		}
 
-		cacheHits := c.loadCache(ctx, cacheItems)
-		cacheMisses := num - cacheHits
-		stats.Record(ctx, mCacheHit.M(int64(cacheHits)))
-		stats.Record(ctx, mCacheMiss.M(int64(cacheMisses)))
+		c.loadCache(ctx, cacheItems)
+		cacheStatsByKind(ctx, cacheItems)
 
 		c.lockCache(ctx, cacheItems)
 
@@ -201,7 +198,7 @@ func (c *Client) getMulti(ctx context.Context,
 }
 
 // loadCache will return the # of cache hits
-func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) (cacheHits int) {
+func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) {
 
 	cacheKeys := make([]string, len(cacheItems))
 	for i, cacheItem := range cacheItems {
@@ -225,7 +222,6 @@ func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) (cacheHi
 			case noneItem:
 				cacheItems[i].state = done
 				cacheItems[i].err = datastore.ErrNoSuchEntity
-				cacheHits++
 			case entityItem:
 				pl := datastore.PropertyList{}
 				if err := unmarshal(item.Value, &pl); err != nil {
@@ -235,7 +231,6 @@ func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) (cacheHi
 				}
 				if err := setValue(cacheItems[i].val, pl, cacheItems[i].key); err == nil {
 					cacheItems[i].state = done
-					cacheHits++
 				} else {
 					c.onError(ctx, errors.Wrapf(err, "nds:loadCache setValue"))
 					cacheItems[i].state = externalLock
