@@ -20,3 +20,10 @@ Ultimately all you need to do is find/replace the following in your codebase:
 - `datastore.Put` -> `nds.Put`
 - `datastore.Delete` -> `nds.Delete`
 - `datastore.RunInTransaction` -> `nds.RunInTransaction`
+
+## Versions
+
+Versions are specified using [Go Modules](https://github.com/golang/go/wiki/Modules).
+
+- Version 1.x.x: Can be found on branch [`master`](https://github.com/qedus/nds/tree/master) and uses the `google.golang.org/appengine` package.
+- Version 2.x.x: Can be found on branch [`v2`](https://github.com/qedus/nds/tree/v2). This is a major update and takes advantage of the new `cloud.google.com/go/datastore` package provided by Google. It currently in an experimental state and we welcome contributions.
