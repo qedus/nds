@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/datastore"
@@ -62,7 +63,9 @@ func PutMultiTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func PutMultiErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t, nil)
+		ndsClient, err := NewClient(ctx, cacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "expected error")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -208,7 +211,9 @@ func PutMultiUnlockCacheSuccessTest(ctx context.Context, cacher nds.Cacher) func
 			},
 		}
 
-		ndsClient, err := NewClient(ctx, testCacher, t, nil)
+		ndsClient, err := NewClient(ctx, testCacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "expected error")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
