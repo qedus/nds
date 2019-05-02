@@ -31,7 +31,7 @@ func MutateInsertTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +107,7 @@ func MutateUpdateTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,7 +183,7 @@ func MutateUpsertTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -243,7 +243,7 @@ func MutateDeleteTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -297,7 +297,7 @@ func MutateZeroArgTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -323,7 +323,7 @@ func MutateLockFailureTest(ctx context.Context, cacher nds.Cacher) func(t *testi
 			return nil
 		})
 
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -354,7 +354,7 @@ func MutateUnlockCacheSuccessTest(ctx context.Context, cacher nds.Cacher) func(t
 			},
 		}
 
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -385,7 +385,7 @@ func MutateDatastoreErrorTest(ctx context.Context, cacher nds.Cacher) func(t *te
 		})
 		defer nds.SetDatastoreMutateHook(nil)
 
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +411,7 @@ func MutateBadContextTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 		badctx, cancel := context.WithCancel(ctx)
 		cancel()
 
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -435,7 +435,7 @@ func MutateTrackingTest(ctx context.Context, cacher nds.Cacher) func(t *testing.
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

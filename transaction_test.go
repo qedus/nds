@@ -40,7 +40,7 @@ func TransactionGetTest(ctx context.Context, cacher nds.Cacher) func(t *testing.
 				return nil, errors.New("should not be called")
 			},
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,7 +57,7 @@ func TransactionGetTest(ctx context.Context, cacher nds.Cacher) func(t *testing.
 		}
 
 		t.Run("Transaction_Get", func(t *testing.T) {
-			ndsClient, err := NewClient(ctx, testCacher, t)
+			ndsClient, err := NewClient(ctx, testCacher, t, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -82,7 +82,7 @@ func TransactionGetTest(ctx context.Context, cacher nds.Cacher) func(t *testing.
 		})
 
 		t.Run("Transaction_GetMulti", func(t *testing.T) {
-			ndsClient, err := NewClient(ctx, testCacher, t)
+			ndsClient, err := NewClient(ctx, testCacher, t, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -118,7 +118,7 @@ func RunInTransactionErrorTest(ctx context.Context, cacher nds.Cacher) func(t *t
 				return errors.New("should not be called")
 			},
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,7 +148,7 @@ func TransactionTrackingTest(ctx context.Context, cacher nds.Cacher) func(t *tes
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -231,7 +231,7 @@ func TransactionTrackingTest(ctx context.Context, cacher nds.Cacher) func(t *tes
 
 func TransactionNewErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -248,7 +248,7 @@ func TransactionNewErrorTest(ctx context.Context, cacher nds.Cacher) func(t *tes
 
 func TransactionCommitTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -293,7 +293,7 @@ func TransactionCommitErrorTest(ctx context.Context, cacher nds.Cacher) func(t *
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -339,7 +339,7 @@ func TransactionCommitErrorTest(ctx context.Context, cacher nds.Cacher) func(t *
 
 func TransactionRollbackTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -382,7 +382,7 @@ func TransactionRollbackTest(ctx context.Context, cacher nds.Cacher) func(t *tes
 func TransactionQueryHelperTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	// TODO: With eventual migration to Firestore Datastore Mode - this test becomes obsolete
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -441,7 +441,7 @@ func TransactionQueryHelperTest(ctx context.Context, cacher nds.Cacher) func(t *
 
 func TransactionOptionsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -487,7 +487,7 @@ func TransactionOptionsTest(ctx context.Context, cacher nds.Cacher) func(t *test
 // RunInTransaction is using a namespace.
 func ClearNamespacedLocksTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

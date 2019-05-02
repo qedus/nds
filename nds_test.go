@@ -156,9 +156,13 @@ func TestMain(m *testing.M) {
 	os.Exit(retCode)
 }
 
-func NewClient(ctx context.Context, cacher nds.Cacher, t *testing.T) (*nds.Client, error) {
+func NewClient(ctx context.Context, cacher nds.Cacher, t *testing.T, logOKTest func(err error) bool) (*nds.Client, error) {
 	onErrorFn := func(_ context.Context, err error) {
-		t.Log(err)
+		if logOKTest != nil && logOKTest(err) {
+			t.Log(err)
+		} else {
+			t.Error(err)
+		}
 	}
 	return nds.NewClient(ctx, cacher, nds.WithOnErrorFunc(onErrorFn))
 }
@@ -203,7 +207,7 @@ func PutGetDeleteTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T)
 			return nil
 		})
 
-		nsdClient, err := NewClient(ctx, testCacher, t)
+		nsdClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,7 +284,7 @@ func PutGetDeleteTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T)
 
 func InterfacesTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -361,7 +365,7 @@ func InterfacesTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func GetMultiNoSuchEntityTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -398,7 +402,7 @@ func GetMultiNoSuchEntityTest(ctx context.Context, cacher nds.Cacher) func(t *te
 
 func GetMultiNoErrorsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -445,7 +449,7 @@ func GetMultiNoErrorsTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 
 func GetMultiErrorMixTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -513,7 +517,7 @@ func GetMultiErrorMixTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 
 func MultiCacheTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -650,7 +654,7 @@ func MultiCacheTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 
 func RunInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -732,14 +736,14 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 	entityVal := &datastore.Entity{
 		Properties: []datastore.Property{
 			datastore.Property{
-				Name: "Int",
-				Value: int64(6),
+				Name:    "Int",
+				Value:   int64(6),
 				NoIndex: false,
 			},
 		},
 	}
 	entityProp := datastore.Property{Name: "Entity",
-	Value: entityVal, NoIndex: false}
+		Value: entityVal, NoIndex: false}
 
 	pl := datastore.PropertyList{
 		timeProp,
@@ -756,7 +760,7 @@ func TestMarshalUnmarshalPropertyList(t *testing.T) {
 		Time     time.Time
 		Key      *datastore.Key
 		GeoPoint datastore.GeoPoint
-		Entity Int
+		Entity   Int
 	}{}
 
 	pl = datastore.PropertyList{}
