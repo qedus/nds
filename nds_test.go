@@ -159,9 +159,9 @@ func TestMain(m *testing.M) {
 func NewClient(ctx context.Context, cacher nds.Cacher, t *testing.T, logOKTest func(err error) bool) (*nds.Client, error) {
 	onErrorFn := func(_ context.Context, err error) {
 		if logOKTest != nil && logOKTest(err) {
-			t.Log(err)
+			t.Logf("%+v", err)
 		} else {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 	}
 	return nds.NewClient(ctx, cacher, nds.WithOnErrorFunc(onErrorFn))

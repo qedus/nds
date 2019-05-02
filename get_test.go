@@ -444,7 +444,10 @@ func GetMultiNoKeysTest(ctx context.Context, cacher nds.Cacher) func(t *testing.
 
 func GetMultiInterfaceErrorTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t, nil)
+		ndsClient, err := NewClient(ctx, cacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "invalid entity type")
+		})
+
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -655,7 +658,9 @@ func GetMultiLockReturnEntitySetValueFailTest(ctx context.Context, cacher nds.Ca
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t, nil)
+		ndsClient, err := NewClient(ctx, testCacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "cannot load field \"One\"")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -791,7 +796,9 @@ func GetMultiLockReturnUnknownTest(ctx context.Context, cacher nds.Cacher) func(
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t, nil)
+		ndsClient, err := NewClient(ctx, testCacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "lockCache unknown")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1114,6 +1121,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 			unmarshals []unmarshalFunc
 
 			expectedErrs []error
+			logTester    func(error) bool
 		}{
 			{
 				"no errors",
@@ -1132,6 +1140,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil},
+				nil,
 			},
 			{
 				"datastore unknown error",
@@ -1150,6 +1159,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{expectedErr},
+				nil,
 			},
 			{
 				"datastore unknown multierror",
@@ -1178,6 +1188,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 				[]error{
 					datastore.MultiError{expectedErr, expectedErr},
 				},
+				nil,
 			},
 			{
 				"marshal error",
@@ -1196,6 +1207,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil},
+				func(err error) bool { return strings.Contains(err.Error(), expectedErr.Error()) },
 			},
 			{
 				"total cache fail",
@@ -1214,6 +1226,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil},
+				func(err error) bool { return strings.Contains(err.Error(), expectedErr.Error()) },
 			},
 			{
 				"lock cache fail",
@@ -1232,6 +1245,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil},
+				func(err error) bool { return strings.Contains(err.Error(), expectedErr.Error()) },
 			},
 			{
 				"cache corrupt",
@@ -1264,6 +1278,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil, nil},
+				func(err error) bool { return strings.Contains(err.Error(), "unexpected EOF") },
 			},
 			{
 				"cache flag corrupt",
@@ -1296,6 +1311,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil, nil},
+				func(err error) bool { return strings.Contains(err.Error(), "loadCache unknown") },
 			},
 			{
 				"lock cache value fail",
@@ -1322,6 +1338,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil},
+				func(err error) bool { return strings.Contains(err.Error(), expectedErr.Error()) },
 			},
 			{
 				"lock cache value none item",
@@ -1353,6 +1370,7 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 						datastore.ErrNoSuchEntity,
 					},
 				},
+				nil,
 			},
 			{
 				"cache get no entity unmarshal fail",
@@ -1363,7 +1381,6 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					func(ctx context.Context, keys []string) (
 						map[string]*nds.Item, error) {
 						items, err := cacher.GetMulti(ctx, keys)
-						// Corrupt flags with unknown number.
 						for _, item := range items {
 							item.Flags = nds.EntityItem
 						}
@@ -1379,12 +1396,13 @@ func GetMultiPathsTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 					nds.UnmarshalPropertyList,
 				},
 				[]error{nil},
+				func(err error) bool { return strings.Contains(err.Error(), "lockCache unmarshal") },
 			},
 		}
 
 		for _, test := range tests {
 			t.Run(test.description, func(t *testing.T) {
-				ndsClient, err := NewClient(ctx, testCacher, t, nil)
+				ndsClient, err := NewClient(ctx, testCacher, t, test.logTester)
 				if err != nil {
 					t.Fatal(err)
 				}

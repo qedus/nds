@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/datastore"
@@ -13,16 +14,18 @@ import (
 
 func TestMutate(t *testing.T) {
 	for _, item := range cachers {
-		t.Run("TestMutateInsert", MutateInsertTests(item.ctx, item.cacher))
-		t.Run("TestMutateUpsert", MutateUpsertTests(item.ctx, item.cacher))
-		t.Run("TestMutateUpdate", MutateUpdateTests(item.ctx, item.cacher))
-		t.Run("TestMutateDelete", MutateDeleteTests(item.ctx, item.cacher))
-		t.Run("TestMutateZeroArg", MutateZeroArgTest(item.ctx, item.cacher))
-		t.Run("TestMutateLockFailure", MutateLockFailureTest(item.ctx, item.cacher))
-		t.Run("TestMutateUnlockCacheSuccess", MutateUnlockCacheSuccessTest(item.ctx, item.cacher))
-		t.Run("TestMutateDatastoreError", MutateDatastoreErrorTest(item.ctx, item.cacher))
-		t.Run("TestMutateBadContext", MutateBadContextTest(item.ctx, item.cacher))
-		t.Run("TestMutateTracking", MutateTrackingTest(item.ctx, item.cacher))
+		t.Run(fmt.Sprintf("cacher=%T", item.cacher), func(t *testing.T) {
+			t.Run("TestMutateInsert", MutateInsertTests(item.ctx, item.cacher))
+			t.Run("TestMutateUpsert", MutateUpsertTests(item.ctx, item.cacher))
+			t.Run("TestMutateUpdate", MutateUpdateTests(item.ctx, item.cacher))
+			t.Run("TestMutateDelete", MutateDeleteTests(item.ctx, item.cacher))
+			t.Run("TestMutateZeroArg", MutateZeroArgTest(item.ctx, item.cacher))
+			t.Run("TestMutateLockFailure", MutateLockFailureTest(item.ctx, item.cacher))
+			t.Run("TestMutateUnlockCacheSuccess", MutateUnlockCacheSuccessTest(item.ctx, item.cacher))
+			t.Run("TestMutateDatastoreError", MutateDatastoreErrorTest(item.ctx, item.cacher))
+			t.Run("TestMutateBadContext", MutateBadContextTest(item.ctx, item.cacher))
+			t.Run("TestMutateTracking", MutateTrackingTest(item.ctx, item.cacher))
+		})
 	}
 }
 
@@ -323,7 +326,9 @@ func MutateLockFailureTest(ctx context.Context, cacher nds.Cacher) func(t *testi
 			return nil
 		})
 
-		ndsClient, err := NewClient(ctx, testCacher, t, nil)
+		ndsClient, err := NewClient(ctx, testCacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "Mutate cache.DeleteMulti")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -354,7 +359,9 @@ func MutateUnlockCacheSuccessTest(ctx context.Context, cacher nds.Cacher) func(t
 			},
 		}
 
-		ndsClient, err := NewClient(ctx, testCacher, t, nil)
+		ndsClient, err := NewClient(ctx, testCacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), "expected error")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +418,9 @@ func MutateBadContextTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 		badctx, cancel := context.WithCancel(ctx)
 		cancel()
 
-		ndsClient, err := NewClient(ctx, testCacher, t, nil)
+		ndsClient, err := NewClient(ctx, testCacher, t, func(err error) bool {
+			return strings.Contains(err.Error(), context.Canceled.Error())
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
