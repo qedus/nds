@@ -26,7 +26,7 @@ func TestDeleteSuite(t *testing.T) {
 
 func DeleteMultiTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -79,7 +79,7 @@ func DeleteMultiTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) 
 
 func DeleteNilKeyTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -92,7 +92,7 @@ func DeleteNilKeyTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T)
 
 func DeleteIncompleteKeyTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +110,7 @@ func DeleteCacheFailTest(ctx context.Context, cacher nds.Cacher) func(t *testing
 		testCacher := &mockCacher{
 			cacher: cacher,
 		}
-		ndsClient, err := NewClient(ctx, testCacher, t)
+		ndsClient, err := NewClient(ctx, testCacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,7 +140,7 @@ func DeleteCacheFailTest(ctx context.Context, cacher nds.Cacher) func(t *testing
 
 func DeleteInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
 	return func(t *testing.T) {
-		ndsClient, err := NewClient(ctx, cacher, t)
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
