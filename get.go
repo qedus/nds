@@ -383,9 +383,6 @@ func (c *Client) loadDatastore(ctx context.Context, cacheItems []cacheItem,
 		case nil:
 			pl := vals[i]
 			val := cacheItems[index].val
-			if err := setValue(val, pl, cacheItems[index].key); err != nil {
-				cacheItems[index].err = err
-			}
 
 			if cacheItems[index].state == internalLock {
 				cacheItems[index].item.Flags = entityItem
@@ -396,6 +393,10 @@ func (c *Client) loadDatastore(ctx context.Context, cacheItems []cacheItem,
 					cacheItems[index].state = externalLock
 					c.onError(ctx, errors.Wrap(err, "nds:loadDatastore marshal"))
 				}
+			}
+
+			if err := setValue(val, pl, cacheItems[index].key); err != nil {
+				cacheItems[index].err = err
 			}
 		case datastore.ErrNoSuchEntity:
 			if cacheItems[index].state == internalLock {

@@ -42,6 +42,7 @@ func TestGetSuite(t *testing.T) {
 			t.Run("TestUnsupportedValueType", UnsupportedValueTypeTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiFieldMismatch", GetMultiFieldMismatchTest(item.ctx, item.cacher))
 			t.Run("TestGetMultiExpiredContext", GetMultiExpiredContextTest(item.ctx, item.cacher))
+			t.Run("TestPropertyLoadSaverModification", PropertyLoadSaverModificationTest(item.ctx, item.cacher))
 		})
 	}
 }
@@ -1707,6 +1708,59 @@ func GetMultiExpiredContextTest(ctx context.Context, cacher nds.Cacher) func(t *
 			t.Errorf("expected non-nil error")
 		} else if !strings.Contains(err.Error(), cctx.Err().Error()) {
 			t.Errorf("expected err `%v` to contain `%v`", cctx.Err(), err)
+		}
+	}
+}
+
+type PropertyLoadSaverModifyTest struct {
+	Name string
+	Name2 string
+	Name3 string
+	Name4 string
+}
+
+func (p *PropertyLoadSaverModifyTest) Load(ps []datastore.Property) error {
+	// Drop the second item
+	ps = append(ps[:1], ps[2:]...)
+
+	return datastore.LoadStruct(p, ps)
+}
+
+func (p *PropertyLoadSaverModifyTest) Save() ([]datastore.Property, error) {
+	return datastore.SaveStruct(p)
+}
+
+// PropertyLoadSaverModificationTest tests for the situation in which the PropertyList is shrunk in the Load call
+// but nds is unaware
+func PropertyLoadSaverModificationTest(ctx context.Context, cacher nds.Cacher) func(t *testing.T) {
+	return func(t *testing.T) {
+		ndsClient, err := NewClient(ctx, cacher, t, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		key := datastore.NameKey("PropertyLoadSaverModifyTest", "name", nil)
+		val := &PropertyLoadSaverModifyTest{
+			Name: "Name",
+			Name2: "Name2",
+			Name3: "Name3",
+			Name4: "Name4",
+		}
+
+		if _, err := ndsClient.Put(ctx, key, val); err != nil {
+			t.Fatal(err)
+		}
+
+		// Get from datastore.
+		newVal := &PropertyLoadSaverModifyTest{}
+		if err := ndsClient.Get(ctx, key, newVal); err != nil {
+			t.Fatal(err)
+		}
+
+		// Get from cache.
+		newVal = &PropertyLoadSaverModifyTest{}
+		if err := ndsClient.Get(ctx, key, newVal); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
