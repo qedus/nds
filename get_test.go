@@ -606,8 +606,8 @@ func GetSlicePropertyTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 			t.Fatal(err)
 		}
 
-		if !reflect.DeepEqual(val.IntVals, intVals) {
-			t.Fatal("slice properties not equal", val.IntVals)
+		if !reflect.DeepEqual(newVal.IntVals, intVals) {
+			t.Fatal("slice properties not equal", newVal.IntVals)
 		}
 
 		// Get from cache.
@@ -616,8 +616,8 @@ func GetSlicePropertyTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 			t.Fatal(err)
 		}
 
-		if !reflect.DeepEqual(val.IntVals, intVals) {
-			t.Fatal("slice properties not equal", val.IntVals)
+		if !reflect.DeepEqual(newVal.IntVals, intVals) {
+			t.Fatal("slice properties not equal", newVal.IntVals)
 		}
 	}
 }
