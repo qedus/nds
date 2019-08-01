@@ -30,7 +30,6 @@ func TestClient_onError(t *testing.T) {
 		t.Fatalf("could not get datastore client: %v", err)
 	}
 	type testObject struct {
-		name string
 	}
 	testKeys := []*datastore.Key{datastore.NameKey("onErrorTest", "name", nil)}
 	testObj := []testObject{{}}
@@ -73,7 +72,7 @@ func TestNewClient(t *testing.T) {
 	cancel()
 
 	type args struct {
-		ctx context.Context
+		ctx    context.Context
 		cacher nds.Cacher
 	}
 	tests := []struct {
@@ -84,7 +83,7 @@ func TestNewClient(t *testing.T) {
 		{
 			"nil test",
 			args{
-				ctx: context.Background(),
+				ctx:    context.Background(),
 				cacher: nil,
 			},
 			false,
@@ -92,7 +91,7 @@ func TestNewClient(t *testing.T) {
 		{
 			"bad context test",
 			args{
-				ctx: cctx,
+				ctx:    cctx,
 				cacher: nil,
 			},
 			true,
@@ -108,4 +107,3 @@ func TestNewClient(t *testing.T) {
 		})
 	}
 }
-

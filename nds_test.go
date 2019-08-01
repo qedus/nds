@@ -673,7 +673,7 @@ func RunInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 		}
 		var putKey *datastore.PendingKey
 		commit, err := ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
-			entities := make([]testEntity, 1, 1)
+			entities := make([]testEntity, 1)
 			if err := tx.GetMulti(keys, entities); err != nil {
 				t.Fatal(err)
 			}
@@ -704,7 +704,7 @@ func RunInTransactionTest(ctx context.Context, cacher nds.Cacher) func(t *testin
 			t.Fatal("keys not equal")
 		}
 
-		entities = make([]testEntity, 1, 1)
+		entities = make([]testEntity, 1)
 		if err := ndsClient.GetMulti(ctx, keys, entities); err != nil {
 			t.Fatal(err)
 		}

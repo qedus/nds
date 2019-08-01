@@ -9,7 +9,7 @@ import (
 	"github.com/qedus/nds/v2"
 )
 
-type backend struct {}
+type backend struct{}
 
 // NewCacher will return a nds.Cacher backed by AppEngine's memcache.
 func NewCacher() nds.Cacher {

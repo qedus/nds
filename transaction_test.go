@@ -225,7 +225,7 @@ func TransactionTrackingTest(ctx context.Context, cacher nds.Cacher) func(t *tes
 		}
 
 		// Cleanup
-		ndsClient.DeleteMulti(ctx, testKeys)
+		_ = ndsClient.DeleteMulti(ctx, testKeys)
 	}
 }
 
@@ -403,7 +403,7 @@ func TransactionQueryHelperTest(ctx context.Context, cacher nds.Cacher) func(t *
 			t.Fatalf("could not store entity due to error: %v", err)
 		}
 
-		defer ndsClient.Delete(ctx, key) // Cleanup
+		defer func() { _ = ndsClient.Delete(ctx, key) }() // Cleanup
 
 		_, err = ndsClient.RunInTransaction(ctx, func(tx *nds.Transaction) error {
 			var dest []testEntity
@@ -534,6 +534,6 @@ func ClearNamespacedLocksTest(ctx context.Context, cacher nds.Cacher) func(t *te
 		}
 
 		// Cleanup
-		ndsClient.Delete(ctx, key)
+		_ = ndsClient.Delete(ctx, key)
 	}
 }
