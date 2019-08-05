@@ -232,7 +232,7 @@ func CacherImplementationTest(ctx context.Context, cacher nds.Cacher) func(t *te
 					} else if got == nil {
 						if result, err := cacher.GetMulti(tt.args.c, keys); err != nil {
 							t.Errorf("expected err = nil, got %v", err)
-						} else if result != nil && len(result) != 0 {
+						} else if len(result) != 0 {
 							t.Errorf("expected len(cacher.GetMulti()) = 0, got %d", len(result))
 						}
 					}

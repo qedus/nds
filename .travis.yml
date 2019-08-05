@@ -1,10 +1,10 @@
 language: go
 sudo: false
 go:
-  - 1.10.x
   - 1.11.x
+  - 1.12.x
 env:
-  - REDIS_ADDR="localhost:6379" APPENGINE_DEV_APPSERVER="$HOME/google-cloud-sdk/bin/dev_appserver.py" GO111MODULE="on"
+  - REDIS_ADDR="localhost:6379" APPENGINE_DEV_APPSERVER="$HOME/google-cloud-sdk/bin/dev_appserver.py" GO111MODULE="on" DATASTORE_EMULATOR_HOST="localhost:8432" DATASTORE_PROJECT_ID="nds-test"
 services:
   - redis-server
 before_install:
@@ -16,13 +16,15 @@ install:
   - "$HOME/google-cloud-sdk/bin/gcloud components install app-engine-python --quiet"
   - "$HOME/google-cloud-sdk/bin/gcloud components install app-engine-go --quiet"
   - go get -v -d -t ./...
+  - go get github.com/golangci/golangci-lint/cmd/golangci-lint
 before_script:
   - "$HOME/google-cloud-sdk/bin/gcloud config set project nds-test"
-  - "$HOME/google-cloud-sdk/bin/gcloud beta emulators datastore start --quiet &"
-  - sleep 15
-  - "$($HOME/google-cloud-sdk/bin/gcloud beta emulators datastore env-init)"
+  - "$HOME/google-cloud-sdk/bin/gcloud beta emulators datastore start --quiet --no-store-on-disk --consistency=1 --host-port=localhost:8432 &"
+  - timeout 300 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' $DATASTORE_EMULATOR_HOST)" != "200" ]]; do sleep 5; done' || false
 script:
   - go test -covermode=count -coverprofile=profile.cov -coverpkg=$(go list ./... | grep -v '/vendor/' | paste -sd, -) ./...
+  - go test -race ./...
+  - golangci-lint run ./...
 after_success:
   - go get -v github.com/mattn/goveralls
   - export PATH=$PATH:$HOME/gopath/bin

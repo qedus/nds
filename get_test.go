@@ -1713,7 +1713,7 @@ func GetMultiExpiredContextTest(ctx context.Context, cacher nds.Cacher) func(t *
 }
 
 type PropertyLoadSaverModifyTest struct {
-	Name string
+	Name  string
 	Name2 string
 	Name3 string
 	Name4 string
@@ -1741,7 +1741,7 @@ func PropertyLoadSaverModificationTest(ctx context.Context, cacher nds.Cacher) f
 
 		key := datastore.NameKey("PropertyLoadSaverModifyTest", "name", nil)
 		val := &PropertyLoadSaverModifyTest{
-			Name: "Name",
+			Name:  "Name",
 			Name2: "Name2",
 			Name3: "Name3",
 			Name4: "Name4",

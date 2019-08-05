@@ -101,7 +101,7 @@ func MutateInsertTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 			}
 		})
 
-		ndsClient.DeleteMulti(ctx, keys) // Cleanup
+		_ = ndsClient.DeleteMulti(ctx, keys) // Cleanup
 	}
 }
 
@@ -124,7 +124,7 @@ func MutateUpdateTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 			datastore.NameKey("MutateUpdateTests", "test2", nil),
 		}
 
-		defer ndsClient.DeleteMulti(ctx, keys) // Cleanup
+		defer func() { _ = ndsClient.DeleteMulti(ctx, keys) }() // Cleanup
 
 		t.Run("Failure", func(t *testing.T) {
 			// Update non-existent key failure
@@ -237,7 +237,7 @@ func MutateUpsertTests(ctx context.Context, cacher nds.Cacher) func(t *testing.T
 			}
 		})
 
-		ndsClient.DeleteMulti(ctx, keys) // Cleanup
+		_ = ndsClient.DeleteMulti(ctx, keys) // Cleanup
 	}
 }
 

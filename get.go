@@ -171,7 +171,9 @@ func (c *Client) getMulti(ctx context.Context,
 		}
 
 		c.loadCache(ctx, cacheItems)
-		cacheStatsByKind(ctx, cacheItems)
+		if err := cacheStatsByKind(ctx, cacheItems); err != nil {
+			c.onError(ctx, errors.Wrapf(err, "nds:getMulti cacheStatsByKind"))
+		}
 
 		c.lockCache(ctx, cacheItems)
 
@@ -241,8 +243,6 @@ func (c *Client) loadCache(ctx context.Context, cacheItems []cacheItem) {
 			}
 		}
 	}
-
-	return
 }
 
 // itemLock creates a pseudorandom cache lock value that enables each call of

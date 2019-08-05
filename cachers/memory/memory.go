@@ -72,9 +72,9 @@ func (m *memory) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) err
 				Value: append([]byte(nil), obj.value...),
 			}
 			hasher := sha1.New()
-			binary.Write(hasher, binary.LittleEndian, ndsItem.Flags)
-			hasher.Write(ndsItem.Value) // err is always nil
-			if bytes.Compare(item.GetCASInfo().([]byte), hasher.Sum(nil)) == 0 {
+			_ = binary.Write(hasher, binary.LittleEndian, ndsItem.Flags)
+			_, _ = hasher.Write(ndsItem.Value) // err is always nil
+			if bytes.Equal(item.GetCASInfo().([]byte), hasher.Sum(nil)) {
 				m.store.Set(item.Key, &object{flags: item.Flags, value: append([]byte(nil), item.Value...)}, item.Expiration)
 			} else {
 				hasErr = true
@@ -134,8 +134,8 @@ func (m *memory) GetMulti(ctx context.Context, keys []string) (map[string]*nds.I
 				Value: append([]byte(nil), obj.value...),
 			}
 			hasher := sha1.New()
-			binary.Write(hasher, binary.LittleEndian, ndsItem.Flags)
-			hasher.Write(ndsItem.Value)
+			_ = binary.Write(hasher, binary.LittleEndian, ndsItem.Flags)
+			_, _ = hasher.Write(ndsItem.Value)
 			ndsItem.SetCASInfo(hasher.Sum(nil))
 			result[key] = ndsItem
 		}

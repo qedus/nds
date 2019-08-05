@@ -35,7 +35,7 @@ var (
 	}
 )
 
-func cacheStatsByKind(ctx context.Context, items []cacheItem) {
+func cacheStatsByKind(ctx context.Context, items []cacheItem) error {
 	cacheStats := make(map[string]*[2]int64)
 
 	for _, item := range items {
@@ -52,12 +52,16 @@ func cacheStatsByKind(ctx context.Context, items []cacheItem) {
 	}
 
 	for key, s := range cacheStats {
-		stats.RecordWithTags(ctx,
+		if err := stats.RecordWithTags(ctx,
 			[]tag.Mutator{
 				tag.Upsert(KeyKind, key),
 			},
 			mCacheHit.M(s[0]),
 			mCacheMiss.M(s[1]),
-		)
+		); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
