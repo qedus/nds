@@ -36,10 +36,6 @@ const (
 	end`
 )
 
-var (
-	casSha = ""
-)
-
 // NewCacher will return a nds.Cacher backed by
 // the provided redis pool. It will try and load a script
 // into the redis script cache and return an error if it is
@@ -54,17 +50,20 @@ func NewCacher(ctx context.Context, pool *redis.Pool) (n nds.Cacher, err error) 
 		}
 	}()
 
-	if casSha, err = redis.String(conn.DoContext(ctx, "SCRIPT", "LOAD", casScript)); err != nil {
+	b := backend{store: pool}
+
+	if b.casSha, err = redis.String(conn.DoContext(ctx, "SCRIPT", "LOAD", casScript)); err != nil {
 		return
 	}
 
-	n = &backend{store: pool}
+	n = &b
 
 	return
 }
 
 type backend struct {
-	store *redis.Pool
+	store  *redis.Pool
+	casSha string
 }
 
 var bufPool = sync.Pool{
@@ -102,7 +101,7 @@ func set(ctx context.Context, conn redis.ConnWithContext, nx bool, items []*nds.
 		defer close(meChan)
 
 		buf := bufPool.Get().(*bytes.Buffer)
-Loop:
+	Loop:
 		for _, item := range items {
 			select {
 			case <-ctx.Done():
@@ -136,7 +135,7 @@ Loop:
 
 	go func() {
 		defer wg.Done()
-Loop2:
+	Loop2:
 		for i := 0; i < len(items); i++ {
 			select {
 			case <-ctx.Done():
@@ -199,7 +198,7 @@ func (b *backend) CompareAndSwapMulti(ctx context.Context, items []*nds.Item) (e
 		defer close(meChan)
 
 		buf := bufPool.Get().(*bytes.Buffer)
-Loop:
+	Loop:
 		for _, item := range items {
 			select {
 			case <-ctx.Done():
@@ -215,7 +214,7 @@ Loop:
 				if item.Expiration == 0 {
 					expire = -1
 				}
-				if rerr := redisConn.SendContext(ctx, "EVALSHA", casSha, "1", item.Key, cas, buf.Bytes(), expire); rerr != nil {
+				if rerr := redisConn.SendContext(ctx, "EVALSHA", b.casSha, "1", item.Key, cas, buf.Bytes(), expire); rerr != nil {
 					meChan <- rerr
 				}
 			} else {
@@ -230,7 +229,7 @@ Loop:
 
 	go func() {
 		defer wg.Done()
-Loop2:
+	Loop2:
 		for i := 0; i < len(items); i++ {
 			select {
 			case <-ctx.Done():
