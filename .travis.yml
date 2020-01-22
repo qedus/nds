@@ -3,6 +3,7 @@ sudo: false
 go:
   - 1.11.x
   - 1.12.x
+  - 1.13.x
 env:
   - REDIS_ADDR="localhost:6379" APPENGINE_DEV_APPSERVER="$HOME/google-cloud-sdk/bin/dev_appserver.py" GO111MODULE="on" DATASTORE_EMULATOR_HOST="localhost:8432" DATASTORE_PROJECT_ID="nds-test"
 services:
@@ -16,7 +17,7 @@ install:
   - "$HOME/google-cloud-sdk/bin/gcloud components install app-engine-python --quiet"
   - "$HOME/google-cloud-sdk/bin/gcloud components install app-engine-go --quiet"
   - go get -v -d -t ./...
-  - go get github.com/golangci/golangci-lint/cmd/golangci-lint
+  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.1
 before_script:
   - "$HOME/google-cloud-sdk/bin/gcloud config set project nds-test"
   - "$HOME/google-cloud-sdk/bin/gcloud beta emulators datastore start --quiet --no-store-on-disk --consistency=1 --host-port=localhost:8432 &"
