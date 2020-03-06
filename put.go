@@ -121,17 +121,20 @@ func putMulti(c context.Context,
 
 	lockMemcacheKeys := make([]string, 0, len(keys))
 	lockMemcacheItems := make([]*memcache.Item, 0, len(keys))
-	for _, key := range keys {
-		if !key.Incomplete() {
-			item := &memcache.Item{
-				Key:        createMemcacheKey(key),
-				Flags:      lockItem,
-				Value:      itemLock(),
-				Expiration: memcacheLockTime,
-			}
-			lockMemcacheItems = append(lockMemcacheItems, item)
-			lockMemcacheKeys = append(lockMemcacheKeys, item.Key)
+	incompleteIndexes := make(map[int]struct{}, len(keys))
+	for i, key := range keys {
+		if key.Incomplete() {
+			incompleteIndexes[i] = struct{}{}
+			continue
 		}
+		item := &memcache.Item{
+			Key:        createMemcacheKey(key),
+			Flags:      lockItem,
+			Value:      itemLock(),
+			Expiration: memcacheLockTime,
+		}
+		lockMemcacheItems = append(lockMemcacheItems, item)
+		lockMemcacheKeys = append(lockMemcacheKeys, item.Key)
 	}
 
 	memcacheCtx, err := memcacheContext(c)
@@ -156,7 +159,21 @@ func putMulti(c context.Context,
 		tx.Unlock()
 	} else if err := memcacheSetMulti(memcacheCtx,
 		lockMemcacheItems); err != nil {
-		return nil, err
+		me, ok := err.(appengine.MultiError)
+		if !ok {
+			return nil, err
+		}
+		retErr := make(appengine.MultiError, len(keys))
+		meIdx := 0
+		for i := range keys {
+			if _, ok := incompleteIndexes[i]; ok {
+				retErr[i] = nil
+				continue
+			}
+			retErr[i] = me[meIdx]
+			meIdx++
+		}
+		return keys, retErr
 	}
 
 	// Save to the datastore.

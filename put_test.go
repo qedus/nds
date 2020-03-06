@@ -162,6 +162,56 @@ func TestPutMultiLockFailure(t *testing.T) {
 	}
 }
 
+func TestPutMultiLockFailureWithMultiError(t *testing.T) {
+	c, closeFunc := NewContext(t)
+	defer closeFunc()
+
+	type testEntity struct {
+		IntVal int
+	}
+
+	nds.SetMemcacheSetMulti(func(c context.Context,
+		items []*memcache.Item) error {
+		errs := appengine.MultiError{
+			errors.New("unexpected error"),
+			nil,
+			errors.New("unexpected error"),
+		}
+		return errs
+	})
+
+	defer func() {
+		nds.SetMemcacheSetMulti(memcache.SetMulti)
+	}()
+
+	keys := []*datastore.Key{
+		datastore.NewKey(c, "Test", "", 1, nil),
+		datastore.NewKey(c, "Test", "", 0, nil), // incomplete key
+		datastore.NewKey(c, "Test", "", 2, nil),
+		datastore.NewKey(c, "Test", "", 3, nil),
+		datastore.NewKey(c, "Test", "", 0, nil), // incomplete key
+	}
+	vals := []testEntity{
+		{42},
+		{43},
+		{44},
+		{45},
+		{46},
+	}
+
+	_, err := nds.PutMulti(c, keys, vals)
+	if err == nil {
+		t.Fatal("expected nds.PutMulti error")
+	}
+	me, ok := err.(appengine.MultiError)
+	if !ok {
+		t.Fatal("expected appengine.MultiError")
+	}
+	if len(me) != len(keys) {
+		t.Fatal("expected multi error length equals keys length")
+	}
+}
+
 // Make sure PutMulti still works if we have a memcache unlock failure.
 func TestPutMultiUnlockMemcacheSuccess(t *testing.T) {
 	c, closeFunc := NewContext(t)
