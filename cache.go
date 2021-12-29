@@ -70,7 +70,7 @@ type Cacher interface {
 }
 
 // Item is the unit of Cacher gets and sets.
-// Taken from google.golang.org/appengine/memcache
+// Taken from google.golang.org/appengine/v2/memcache
 type Item struct {
 	// Key is the Item's key (250 bytes maximum).
 	Key string

@@ -10,7 +10,7 @@ require (
 	go.opencensus.io v0.22.4
 	golang.org/x/sys v0.0.0-20200722175500-76b94024e4b6 // indirect
 	golang.org/x/tools v0.0.0-20200723000907-a7c6fd066f6d // indirect
-	google.golang.org/appengine v1.6.6
+	google.golang.org/appengine/v2 v2.0.1
 	google.golang.org/genproto v0.0.0-20200722002428-88e341933a54 // indirect
 )
 
