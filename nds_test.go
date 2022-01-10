@@ -16,7 +16,7 @@ import (
 
 	"cloud.google.com/go/datastore"
 	"github.com/opencensus-integrations/redigo/redis"
-	"google.golang.org/appengine/aetest"
+	"google.golang.org/appengine/v2/aetest"
 
 	"github.com/qedus/nds/v2"
 	"github.com/qedus/nds/v2/cachers/memcache"

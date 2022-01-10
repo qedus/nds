@@ -3,8 +3,8 @@ package memcache
 import (
 	"context"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/memcache"
+	"google.golang.org/appengine/v2"
+	"google.golang.org/appengine/v2/memcache"
 
 	"github.com/qedus/nds/v2"
 )
