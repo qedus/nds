@@ -1,7 +1,7 @@
 module github.com/qedus/nds
 
 require (
-	golang.org/x/net v0.8.0
+	golang.org/x/net v0.12.0
 	google.golang.org/appengine v1.6.7
 )
 
